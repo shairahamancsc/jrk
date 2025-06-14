@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useForm } from 'react-hook-form';
@@ -10,8 +11,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from "@/hooks/use-toast";
 import { CalendarCheck, CalendarIcon, UserCheck, ListChecks } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -64,24 +65,30 @@ export function AttendanceForm() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-foreground flex items-center gap-1"><UserCheck size={16}/>Select Labor</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Choose a labor" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
+                    <FormControl>
+                      <RadioGroup
+                        onValueChange={field.onChange}
+                        value={field.value}
+                        className="space-y-1"
+                      >
                         {laborProfiles.length > 0 ? (
-                          laborProfiles.map(profile => (
-                            <SelectItem key={profile.id} value={profile.id}>
-                              {profile.name}
-                            </SelectItem>
-                          ))
+                          <ScrollArea className="h-[150px] w-full rounded-md border p-3">
+                            {laborProfiles.map(profile => (
+                              <FormItem key={profile.id} className="flex items-center space-x-3 space-y-0 mb-2 last:mb-0">
+                                <FormControl>
+                                  <RadioGroupItem value={profile.id} id={`labor-${profile.id}`} />
+                                </FormControl>
+                                <FormLabel htmlFor={`labor-${profile.id}`} className="font-normal text-foreground cursor-pointer">
+                                  {profile.name}
+                                </FormLabel>
+                              </FormItem>
+                            ))}
+                          </ScrollArea>
                         ) : (
-                          <SelectItem value="-" disabled>No labor profiles available</SelectItem>
+                          <p className="text-sm text-muted-foreground pt-2">No labor profiles available. Please add profiles on the Labor Profiles page.</p>
                         )}
-                      </SelectContent>
-                    </Select>
+                      </RadioGroup>
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -184,3 +191,4 @@ export function AttendanceForm() {
     </Card>
   );
 }
+
