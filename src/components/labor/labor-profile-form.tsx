@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useToast } from "@/hooks/use-toast";
 import { UserPlus, FileText } from 'lucide-react';
+import type { LaborProfile } from '@/types';
 
 export function LaborProfileForm() {
   const { addLaborProfile } = useData();
@@ -20,22 +21,24 @@ export function LaborProfileForm() {
     defaultValues: {
       name: '',
       contact: '',
+      photo: undefined,
+      aadhaar: undefined,
+      pan: undefined,
+      drivingLicense: undefined,
     },
   });
 
   const onSubmit = (data: LaborProfileFormData) => {
-    const profileData = {
+    // After Zod transformation, data.photo, data.aadhaar, etc., are File | undefined
+    const profileData: Omit<LaborProfile, 'id' | 'createdAt'> = {
       name: data.name,
       contact: data.contact,
-      // For MVP, we are not handling file uploads to a server.
-      // The File objects themselves will be stored in context state.
-      // In a real app, you'd upload these and store URLs.
-      photo: data.photo?.[0],
-      aadhaar: data.aadhaar?.[0],
-      pan: data.pan?.[0],
-      drivingLicense: data.drivingLicense?.[0],
+      photo: data.photo, 
+      aadhaar: data.aadhaar,
+      pan: data.pan,
+      drivingLicense: data.drivingLicense,
     };
-    addLaborProfile(profileData as any); // Cast as any because File object is not string
+    addLaborProfile(profileData); 
     toast({
       title: "Profile Added",
       description: `${data.name}'s profile has been successfully created.`,
@@ -53,7 +56,7 @@ export function LaborProfileForm() {
           type="file" 
           accept="image/*,application/pdf"
           className="file:text-primary file:font-semibold file:mr-2 file:border-0 file:bg-accent file:text-accent-foreground file:rounded-md file:px-2 file:py-1 hover:file:bg-accent/80"
-          {...form.register(field.name)}
+          {...form.register(field.name)} // RHF handles FileList here
         />
       </FormControl>
       <FormMessage />
@@ -101,7 +104,7 @@ export function LaborProfileForm() {
               />
             </div>
 
-            <h3 className="text-lg font-semibold text-primary pt-4 border-t mt-6">Upload Documents</h3>
+            <h3 className="text-lg font-semibold text-primary pt-4 border-t mt-6">Upload Documents (Optional)</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <FormField
                 control={form.control}
