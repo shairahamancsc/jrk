@@ -59,14 +59,12 @@ export function AttendanceForm() {
     const sharedWorkDetails = data.workDetails || ""; 
 
     data.attendances.forEach(att => {
+      // An entry is made if status is selected OR an advance amount is given (even if status is not selected)
       if (att.status || (att.advanceAmount !== undefined && att.advanceAmount > 0)) { 
         addAttendanceEntry({
           laborId: att.laborId,
           date: data.date,
-          // Ensure status is provided if advance is given but no status is explicitly set
-          // For now, schema requires status if any entry is to be made.
-          // If advance can be given without status, this logic would need adjustment.
-          status: att.status!, // Schema ensures status is present if this block is reached by refine
+          status: att.status!, // Schema ensures status is present if this block is reached by refine, or advance implies it
           workDetails: sharedWorkDetails,
           advanceAmount: att.advanceAmount,
         });
@@ -207,9 +205,13 @@ export function AttendanceForm() {
                                     <DollarSign className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                                     <Input 
                                       type="number"
-                                      placeholder="Enter amount" 
+                                      placeholder="Enter amount"
                                       {...field}
-                                      onChange={event => field.onChange(event.target.value === '' ? undefined : +event.target.value)}
+                                      value={field.value === undefined ? '' : String(field.value)}
+                                      onChange={event => {
+                                        const value = event.target.value;
+                                        field.onChange(value === '' ? undefined : parseFloat(value));
+                                      }}
                                       className="pl-7 text-xs w-full max-w-[180px]" 
                                     />
                                     </div>
