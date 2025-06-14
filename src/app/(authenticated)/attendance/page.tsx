@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useMemo, useState, useEffect } from 'react';
@@ -23,7 +24,7 @@ export default function AttendancePage() {
   const recentEntries = useMemo(() => {
     return [...attendanceEntries]
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-      .slice(0, 10); // Show last 10 entries
+      .slice(0, 10); 
   }, [attendanceEntries]);
 
   const getStatusColor = (status: AttendanceEntry['status']) => {
@@ -83,7 +84,7 @@ export default function AttendancePage() {
                             {entry.status.charAt(0).toUpperCase() + entry.status.slice(1)}
                           </Badge>
                         </TableCell>
-                        <TableCell className="max-w-xs truncate">{entry.workDetails}</TableCell>
+                        <TableCell className="max-w-xs truncate">{entry.workDetails || 'N/A'}</TableCell>
                         <TableCell>{format(new Date(entry.createdAt), "Pp")}</TableCell>
                       </TableRow>
                     );

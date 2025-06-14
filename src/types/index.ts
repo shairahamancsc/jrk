@@ -1,3 +1,4 @@
+
 export interface LaborProfile {
   id: string;
   name: string;
@@ -17,6 +18,6 @@ export interface AttendanceEntry {
   laborName?: string; // For display purposes
   date: Date;
   status: AttendanceStatus;
-  workDetails: string;
+  workDetails?: string; // Made optional
   createdAt: Date;
 }

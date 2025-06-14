@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { ReactNode } from 'react';
@@ -41,7 +42,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   useEffect(() => {
-    if (!isLoading) { // only save if initial load is complete
+    if (!isLoading) { 
       try {
         localStorage.setItem(LABOR_PROFILES_STORAGE_KEY, JSON.stringify(laborProfiles));
       } catch (error) {
@@ -51,7 +52,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   }, [laborProfiles, isLoading]);
 
   useEffect(() => {
-     if (!isLoading) { // only save if initial load is complete
+     if (!isLoading) { 
       try {
         localStorage.setItem(ATTENDANCE_ENTRIES_STORAGE_KEY, JSON.stringify(attendanceEntries));
       } catch (error) {
@@ -64,7 +65,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   const addLaborProfile = (profileData: Omit<LaborProfile, 'id' | 'createdAt'>) => {
     const newProfile: LaborProfile = {
       ...profileData,
-      id: Date.now().toString(), // Simple ID generation
+      id: Date.now().toString(), 
       createdAt: new Date(),
     };
     setLaborProfiles((prev) => [...prev, newProfile]);
@@ -74,8 +75,9 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     const labor = laborProfiles.find(lp => lp.id === entryData.laborId);
     const newEntry: AttendanceEntry = {
       ...entryData,
-      id: Date.now().toString(), // Simple ID generation
+      id: Date.now().toString(), 
       laborName: labor?.name || 'Unknown Labor',
+      workDetails: entryData.workDetails || "", // Ensure workDetails is at least an empty string
       createdAt: new Date(),
     };
     setAttendanceEntries((prev) => [...prev, newEntry]);

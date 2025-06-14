@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useMemo, useState, useEffect } from 'react';
@@ -39,7 +40,7 @@ export default function DashboardPage() {
         const labor = laborProfiles.find(lp => lp.id === entry.laborId);
         const matchesSearch = searchTerm ? 
           (labor?.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-           entry.workDetails.toLowerCase().includes(searchTerm.toLowerCase()))
+           (entry.workDetails || '').toLowerCase().includes(searchTerm.toLowerCase()))
           : true;
 
         return isSameDate && matchesSearch;
@@ -133,7 +134,7 @@ export default function DashboardPage() {
                             {entry.status.charAt(0).toUpperCase() + entry.status.slice(1)}
                           </Badge>
                         </TableCell>
-                        <TableCell className="max-w-xs truncate">{entry.workDetails}</TableCell>
+                        <TableCell className="max-w-xs truncate">{entry.workDetails || 'N/A'}</TableCell>
                         <TableCell>{format(new Date(entry.createdAt), "Pp")}</TableCell>
                       </TableRow>
                     );

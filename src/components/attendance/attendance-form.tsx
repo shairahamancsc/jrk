@@ -4,10 +4,10 @@
 import React, { useEffect, useCallback } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { batchAttendanceSchema, type BatchAttendanceFormData, type AttendanceItemData } from '@/schemas/attendance-schema';
+import { batchAttendanceSchema, type BatchAttendanceFormData } from '@/schemas/attendance-schema';
 import { useData } from '@/contexts/data-context';
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
+// Textarea is removed as workDetails is no longer per labor
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
@@ -15,7 +15,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from "@/hooks/use-toast";
-import { CalendarCheck, CalendarIcon, ListChecks, Users } from 'lucide-react';
+import { CalendarCheck, CalendarIcon, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import type { LaborProfile } from '@/types';
@@ -33,7 +33,7 @@ export function AttendanceForm() {
         laborId: profile.id,
         laborName: profile.name,
         status: undefined,
-        workDetails: "",
+        // workDetails: "", // Removed from default values as it's not collected per labor
       })),
     };
   }, []);
@@ -50,17 +50,17 @@ export function AttendanceForm() {
 
   useEffect(() => {
     form.reset(generateDefaultValues(laborProfiles, form.getValues('date')));
-  }, [laborProfiles, form.reset, generateDefaultValues, form.getValues]);
+  }, [laborProfiles, form.reset, generateDefaultValues, form]);
 
   const onSubmit = (data: BatchAttendanceFormData) => {
     let entriesRecordedCount = 0;
     data.attendances.forEach(att => {
-      if (att.status && att.workDetails) { // Ensure status and workDetails are present
+      if (att.status) { // Only check for status, workDetails is not individually collected
         addAttendanceEntry({
           laborId: att.laborId,
           date: data.date,
           status: att.status,
-          workDetails: att.workDetails,
+          workDetails: "", // Pass empty string for workDetails
         });
         entriesRecordedCount++;
       }
@@ -75,10 +75,10 @@ export function AttendanceForm() {
        toast({
         variant: "destructive",
         title: "No Attendance Marked",
-        description: "Please select a status and provide work details for at least one labor.",
+        description: "Please select a status for at least one labor.", // Updated message
       });
     }
-    form.reset(generateDefaultValues(laborProfiles, new Date())); // Reset form with today's date
+    form.reset(generateDefaultValues(laborProfiles, new Date())); 
   };
 
   return (
@@ -88,7 +88,7 @@ export function AttendanceForm() {
           <CalendarCheck /> Record Daily Attendance
         </CardTitle>
         <CardDescription>
-          Select a date and mark attendance (Present, Absent, Advance) and work details for each labor.
+          Select a date and mark attendance (Present, Absent, Advance) for each labor.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -123,7 +123,12 @@ export function AttendanceForm() {
                       <Calendar
                         mode="single"
                         selected={field.value}
-                        onSelect={field.onChange}
+                        onSelect={(date) => {
+                          field.onChange(date);
+                          // Regenerate default values for attendances if date changes
+                          // to ensure labor list is up-to-date, though labor list itself doesn't depend on date here.
+                          form.reset(generateDefaultValues(laborProfiles, date));
+                        }}
                         disabled={(date) =>
                           date > new Date() || date < new Date("1900-01-01")
                         }
@@ -143,7 +148,7 @@ export function AttendanceForm() {
                     <TableRow>
                       <TableHead className="w-[200px]">Labor Name</TableHead>
                       <TableHead className="w-[250px]">Status</TableHead>
-                      <TableHead>Work Details</TableHead>
+                      {/* Work Details column removed from header */}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -184,24 +189,7 @@ export function AttendanceForm() {
                             )}
                           />
                         </TableCell>
-                        <TableCell className="py-3 align-top">
-                          <FormField
-                            control={form.control}
-                            name={`attendances.${index}.workDetails`}
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormControl>
-                                  <Textarea
-                                    placeholder="Work done / Reason"
-                                    className="resize-none h-10 text-xs"
-                                    {...field}
-                                  />
-                                </FormControl>
-                                <FormMessage className="text-xs" />
-                              </FormItem>
-                            )}
-                          />
-                        </TableCell>
+                        {/* FormField for workDetails removed */}
                       </TableRow>
                     ))}
                   </TableBody>
@@ -220,7 +208,7 @@ export function AttendanceForm() {
                 Record All Marked Attendance
                 </Button>
             )}
-             <FormMessage>{form.formState.errors.attendances?.message}</FormMessage>
+             <FormMessage>{form.formState.errors.attendances?.root?.message || form.formState.errors.attendances?.message}</FormMessage>
           </form>
         </Form>
       </CardContent>
