@@ -16,7 +16,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from "@/hooks/use-toast";
-import { CalendarCheck, CalendarIcon, Users, FileText, DollarSign } from 'lucide-react';
+import { CalendarCheck, CalendarIcon, Users, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import type { LaborProfile } from '@/types';
@@ -59,12 +59,11 @@ export function AttendanceForm() {
     const sharedWorkDetails = data.workDetails || ""; 
 
     data.attendances.forEach(att => {
-      // An entry is made if status is selected OR an advance amount is given (even if status is not selected)
       if (att.status || (att.advanceAmount !== undefined && att.advanceAmount > 0)) { 
         addAttendanceEntry({
           laborId: att.laborId,
           date: data.date,
-          status: att.status!, // Schema ensures status is present if this block is reached by refine, or advance implies it
+          status: att.status!, 
           workDetails: sharedWorkDetails,
           advanceAmount: att.advanceAmount,
         });
@@ -202,7 +201,7 @@ export function AttendanceForm() {
                                   <FormLabel className="sr-only">Advance Amount for {item.laborName}</FormLabel>
                                   <FormControl>
                                     <div className="relative">
-                                    <DollarSign className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                                    <span className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground flex items-center justify-center">₹</span>
                                     <Input 
                                       type="number"
                                       placeholder="Enter amount"

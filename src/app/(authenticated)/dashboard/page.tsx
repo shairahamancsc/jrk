@@ -142,7 +142,7 @@ export default function DashboardPage() {
                         <TableCell className="max-w-xs truncate">{getWorkDetailsDisplay(entry.workDetails)}</TableCell>
                         <TableCell>
                           {entry.advanceAmount !== undefined && entry.advanceAmount > 0
-                            ? `$${entry.advanceAmount.toFixed(2)}` 
+                            ? `₹${entry.advanceAmount.toFixed(2)}` 
                             : 'N/A'}
                         </TableCell>
                         <TableCell>{format(new Date(entry.createdAt), "Pp")}</TableCell>
