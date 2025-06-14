@@ -7,7 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { batchAttendanceSchema, type BatchAttendanceFormData } from '@/schemas/attendance-schema';
 import { useData } from '@/contexts/data-context';
 import { Button } from '@/components/ui/button';
-// Textarea is removed as workDetails is no longer per labor
+import { Textarea } from '@/components/ui/textarea'; // Import Textarea
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
@@ -15,7 +15,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from "@/hooks/use-toast";
-import { CalendarCheck, CalendarIcon, Users } from 'lucide-react';
+import { CalendarCheck, CalendarIcon, Users, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import type { LaborProfile } from '@/types';
@@ -29,11 +29,11 @@ export function AttendanceForm() {
   const generateDefaultValues = useCallback((profiles: LaborProfile[], currentDate?: Date) => {
     return {
       date: currentDate || new Date(),
+      workDetails: "", // Default for shared work details
       attendances: profiles.map(profile => ({
         laborId: profile.id,
         laborName: profile.name,
         status: undefined,
-        // workDetails: "", // Removed from default values as it's not collected per labor
       })),
     };
   }, []);
@@ -54,13 +54,15 @@ export function AttendanceForm() {
 
   const onSubmit = (data: BatchAttendanceFormData) => {
     let entriesRecordedCount = 0;
+    const sharedWorkDetails = data.workDetails || ""; // Get shared work details
+
     data.attendances.forEach(att => {
-      if (att.status) { // Only check for status, workDetails is not individually collected
+      if (att.status) { 
         addAttendanceEntry({
           laborId: att.laborId,
           date: data.date,
           status: att.status,
-          workDetails: "", // Pass empty string for workDetails
+          workDetails: sharedWorkDetails, // Pass shared work details
         });
         entriesRecordedCount++;
       }
@@ -75,7 +77,7 @@ export function AttendanceForm() {
        toast({
         variant: "destructive",
         title: "No Attendance Marked",
-        description: "Please select a status for at least one labor.", // Updated message
+        description: "Please select a status for at least one labor.",
       });
     }
     form.reset(generateDefaultValues(laborProfiles, new Date())); 
@@ -88,7 +90,7 @@ export function AttendanceForm() {
           <CalendarCheck /> Record Daily Attendance
         </CardTitle>
         <CardDescription>
-          Select a date and mark attendance (Present, Absent, Advance) for each labor.
+          Select a date, mark attendance, and provide common work details for all marked entries.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -125,8 +127,6 @@ export function AttendanceForm() {
                         selected={field.value}
                         onSelect={(date) => {
                           field.onChange(date);
-                          // Regenerate default values for attendances if date changes
-                          // to ensure labor list is up-to-date, though labor list itself doesn't depend on date here.
                           form.reset(generateDefaultValues(laborProfiles, date));
                         }}
                         disabled={(date) =>
@@ -148,7 +148,6 @@ export function AttendanceForm() {
                     <TableRow>
                       <TableHead className="w-[200px]">Labor Name</TableHead>
                       <TableHead className="w-[250px]">Status</TableHead>
-                      {/* Work Details column removed from header */}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -189,7 +188,6 @@ export function AttendanceForm() {
                             )}
                           />
                         </TableCell>
-                        {/* FormField for workDetails removed */}
                       </TableRow>
                     ))}
                   </TableBody>
@@ -204,9 +202,28 @@ export function AttendanceForm() {
             )}
             
             { laborProfiles.length > 0 && (
+              <>
+                <FormField
+                  control={form.control}
+                  name="workDetails"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-foreground flex items-center gap-1"><FileText size={16}/>Common Work Details (Optional)</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          placeholder="Enter common work details for all marked labors..."
+                          className="resize-none"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
                 <Button type="submit" className="w-full md:w-auto bg-primary hover:bg-primary/90 text-base py-3 px-6">
                 Record All Marked Attendance
                 </Button>
+              </>
             )}
              <FormMessage>{form.formState.errors.attendances?.root?.message || form.formState.errors.attendances?.message}</FormMessage>
           </form>
