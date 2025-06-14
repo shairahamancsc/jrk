@@ -6,7 +6,7 @@ import { useData } from '@/contexts/data-context';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import type { AttendanceEntry } from '@/types';
+import type { AttendanceEntry, AttendanceStatus } from '@/types';
 import { format } from 'date-fns';
 import { CalendarDays, ListFilter, Loader2 } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
@@ -41,8 +41,7 @@ export default function DashboardPage() {
         const lowerSearchTerm = searchTerm.toLowerCase();
         const matchesSearch = searchTerm ? 
           (labor?.name.toLowerCase().includes(lowerSearchTerm) || 
-           (entry.workDetails || '').toLowerCase().includes(lowerSearchTerm) ||
-           (entry.status === 'advance' && (entry.advanceDetails || '').toLowerCase().includes(lowerSearchTerm)))
+           (entry.workDetails || '').toLowerCase().includes(lowerSearchTerm))
           : true;
 
         return isSameDate && matchesSearch;
@@ -50,20 +49,16 @@ export default function DashboardPage() {
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }, [attendanceEntries, laborProfiles, selectedDate, searchTerm]);
 
-  const getStatusColor = (status: AttendanceEntry['status']) => {
+  const getStatusColor = (status: AttendanceStatus) => {
     switch (status) {
       case 'present': return 'bg-green-500 hover:bg-green-600';
       case 'absent': return 'bg-red-500 hover:bg-red-600';
-      case 'advance': return 'bg-yellow-500 hover:bg-yellow-600 text-black';
       default: return 'bg-gray-500 hover:bg-gray-600';
     }
   };
 
-  const getWorkDetailsDisplay = (entry: AttendanceEntry) => {
-    if (entry.status === 'advance') {
-      return `Advance: ${entry.advanceDetails || 'Details N/A'}`;
-    }
-    return entry.workDetails || 'N/A';
+  const getWorkDetailsDisplay = (workDetails?: string) => {
+    return workDetails || 'N/A';
   };
   
   if (clientLoading) {
@@ -81,7 +76,7 @@ export default function DashboardPage() {
         <h1 className="text-3xl font-headline font-bold text-primary">Daily Attendance Dashboard</h1>
         <div className="flex items-center gap-2">
           <Input 
-            placeholder="Search by name, work, or advance..."
+            placeholder="Search by name or work details..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="max-w-xs"
@@ -127,7 +122,8 @@ export default function DashboardPage() {
                     <TableHead>Labor Name</TableHead>
                     <TableHead>Date</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Details</TableHead>
+                    <TableHead>Work Details</TableHead>
+                    <TableHead>Advance Amount</TableHead>
                     <TableHead>Recorded At</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -143,7 +139,12 @@ export default function DashboardPage() {
                             {entry.status.charAt(0).toUpperCase() + entry.status.slice(1)}
                           </Badge>
                         </TableCell>
-                        <TableCell className="max-w-xs truncate">{getWorkDetailsDisplay(entry)}</TableCell>
+                        <TableCell className="max-w-xs truncate">{getWorkDetailsDisplay(entry.workDetails)}</TableCell>
+                        <TableCell>
+                          {entry.advanceAmount !== undefined && entry.advanceAmount > 0
+                            ? `$${entry.advanceAmount.toFixed(2)}` 
+                            : 'N/A'}
+                        </TableCell>
                         <TableCell>{format(new Date(entry.createdAt), "Pp")}</TableCell>
                       </TableRow>
                     );

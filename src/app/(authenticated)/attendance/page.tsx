@@ -7,7 +7,7 @@ import { useData } from '@/contexts/data-context';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import type { AttendanceEntry } from '@/types';
+import type { AttendanceEntry, AttendanceStatus } from '@/types';
 import { format } from 'date-fns';
 import { ListOrdered, Loader2 } from 'lucide-react';
 
@@ -27,20 +27,16 @@ export default function AttendancePage() {
       .slice(0, 10); 
   }, [attendanceEntries]);
 
-  const getStatusColor = (status: AttendanceEntry['status']) => {
+  const getStatusColor = (status: AttendanceStatus) => {
     switch (status) {
       case 'present': return 'bg-green-500 hover:bg-green-600';
       case 'absent': return 'bg-red-500 hover:bg-red-600';
-      case 'advance': return 'bg-yellow-500 hover:bg-yellow-600 text-black';
       default: return 'bg-gray-500 hover:bg-gray-600';
     }
   };
 
-  const getWorkDetailsDisplay = (entry: AttendanceEntry) => {
-    if (entry.status === 'advance') {
-      return `Advance: ${entry.advanceDetails || 'Details N/A'}`;
-    }
-    return entry.workDetails || 'N/A';
+  const getWorkDetailsDisplay = (workDetails?: string) => {
+    return workDetails || 'N/A';
   };
 
 
@@ -76,7 +72,8 @@ export default function AttendancePage() {
                     <TableHead>Labor Name</TableHead>
                     <TableHead>Date</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Details</TableHead>
+                    <TableHead>Work Details</TableHead>
+                    <TableHead>Advance Amount</TableHead>
                     <TableHead>Recorded At</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -92,7 +89,12 @@ export default function AttendancePage() {
                             {entry.status.charAt(0).toUpperCase() + entry.status.slice(1)}
                           </Badge>
                         </TableCell>
-                        <TableCell className="max-w-xs truncate">{getWorkDetailsDisplay(entry)}</TableCell>
+                        <TableCell className="max-w-xs truncate">{getWorkDetailsDisplay(entry.workDetails)}</TableCell>
+                        <TableCell>
+                          {entry.advanceAmount !== undefined && entry.advanceAmount > 0 
+                            ? `$${entry.advanceAmount.toFixed(2)}` 
+                            : 'N/A'}
+                        </TableCell>
                         <TableCell>{format(new Date(entry.createdAt), "Pp")}</TableCell>
                       </TableRow>
                     );

@@ -10,7 +10,7 @@ export interface LaborProfile {
   createdAt: Date;
 }
 
-export type AttendanceStatus = 'present' | 'absent' | 'advance';
+export type AttendanceStatus = 'present' | 'absent';
 
 export interface AttendanceEntry {
   id: string;
@@ -19,6 +19,6 @@ export interface AttendanceEntry {
   date: Date;
   status: AttendanceStatus;
   workDetails?: string; // Common work details for the batch
-  advanceDetails?: string; // Specific details if status is 'advance'
+  advanceAmount?: number; // Numerical advance amount
   createdAt: Date;
 }

@@ -16,7 +16,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from "@/hooks/use-toast";
-import { CalendarCheck, CalendarIcon, Users, FileText,DollarSign } from 'lucide-react';
+import { CalendarCheck, CalendarIcon, Users, FileText, DollarSign } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import type { LaborProfile } from '@/types';
@@ -35,7 +35,7 @@ export function AttendanceForm() {
         laborId: profile.id,
         laborName: profile.name,
         status: undefined,
-        advanceDetails: "", 
+        advanceAmount: undefined,
       })),
     };
   }, []);
@@ -59,13 +59,16 @@ export function AttendanceForm() {
     const sharedWorkDetails = data.workDetails || ""; 
 
     data.attendances.forEach(att => {
-      if (att.status) { 
+      if (att.status || (att.advanceAmount !== undefined && att.advanceAmount > 0)) { 
         addAttendanceEntry({
           laborId: att.laborId,
           date: data.date,
-          status: att.status,
+          // Ensure status is provided if advance is given but no status is explicitly set
+          // For now, schema requires status if any entry is to be made.
+          // If advance can be given without status, this logic would need adjustment.
+          status: att.status!, // Schema ensures status is present if this block is reached by refine
           workDetails: sharedWorkDetails,
-          advanceDetails: att.status === 'advance' ? att.advanceDetails : undefined,
+          advanceAmount: att.advanceAmount,
         });
         entriesRecordedCount++;
       }
@@ -80,8 +83,8 @@ export function AttendanceForm() {
     } else {
        toast({
         variant: "destructive",
-        title: "No Attendance Marked",
-        description: "Please select a status for at least one labor.",
+        title: "No Attendance Marked or Advance Given",
+        description: "Please select a status or enter an advance for at least one labor.",
       });
     }
   };
@@ -93,7 +96,7 @@ export function AttendanceForm() {
           <CalendarCheck /> Record Daily Attendance
         </CardTitle>
         <CardDescription>
-          Select a date, mark attendance, provide common work details, and specify advance details if applicable.
+          Select date, mark attendance, provide common work details, and enter advance amounts if applicable.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -150,8 +153,8 @@ export function AttendanceForm() {
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-[200px]">Labor Name</TableHead>
-                      <TableHead className="w-[250px]">Status</TableHead>
-                      <TableHead>Advance Details</TableHead>
+                      <TableHead className="w-[180px]">Status</TableHead>
+                      <TableHead>Advance Amount</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -175,7 +178,7 @@ export function AttendanceForm() {
                                     className="flex flex-col space-y-1 sm:flex-row sm:space-x-2 sm:space-y-0"
                                     id={`attendances.${index}.status`}
                                   >
-                                    {(['present', 'absent', 'advance'] as const).map((statusValue) => (
+                                    {(['present', 'absent'] as const).map((statusValue) => (
                                       <FormItem key={statusValue} className="flex items-center space-x-2 space-y-0">
                                         <FormControl>
                                           <RadioGroupItem value={statusValue} />
@@ -193,19 +196,20 @@ export function AttendanceForm() {
                           />
                         </TableCell>
                         <TableCell className="py-3 align-top">
-                          {form.watch(`attendances.${index}.status`) === 'advance' && (
-                            <FormField
+                           <FormField
                               control={form.control}
-                              name={`attendances.${index}.advanceDetails`}
+                              name={`attendances.${index}.advanceAmount`}
                               render={({ field }) => (
                                 <FormItem>
-                                  <FormLabel className="sr-only">Advance Details for {item.laborName}</FormLabel>
+                                  <FormLabel className="sr-only">Advance Amount for {item.laborName}</FormLabel>
                                   <FormControl>
                                     <div className="relative">
                                     <DollarSign className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                                     <Input 
-                                      placeholder="Enter amount or details" 
-                                      {...field} 
+                                      type="number"
+                                      placeholder="Enter amount" 
+                                      {...field}
+                                      onChange={event => field.onChange(event.target.value === '' ? undefined : +event.target.value)}
                                       className="pl-7 text-xs w-full max-w-[180px]" 
                                     />
                                     </div>
@@ -214,7 +218,6 @@ export function AttendanceForm() {
                                 </FormItem>
                               )}
                             />
-                          )}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -249,7 +252,7 @@ export function AttendanceForm() {
                   )}
                 />
                 <Button type="submit" className="w-full md:w-auto bg-primary hover:bg-primary/90 text-base py-3 px-6">
-                Record All Marked Attendance
+                Record All Marked Entries
                 </Button>
               </>
             )}

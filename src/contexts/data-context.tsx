@@ -3,7 +3,7 @@
 
 import type { ReactNode } from 'react';
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import type { LaborProfile, AttendanceEntry } from '@/types';
+import type { LaborProfile, AttendanceEntry, AttendanceStatus } from '@/types';
 
 interface DataContextType {
   laborProfiles: LaborProfile[];
@@ -71,14 +71,14 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     setLaborProfiles((prev) => [...prev, newProfile]);
   };
 
-  const addAttendanceEntry = (entryData: Omit<AttendanceEntry, 'id' | 'createdAt' | 'laborName'>) => {
+  const addAttendanceEntry = (entryData: { laborId: string; date: Date; status: AttendanceStatus; workDetails?: string; advanceAmount?: number; }) => {
     const labor = laborProfiles.find(lp => lp.id === entryData.laborId);
     const newEntry: AttendanceEntry = {
       laborId: entryData.laborId,
       date: entryData.date,
       status: entryData.status,
       workDetails: entryData.workDetails || "",
-      advanceDetails: entryData.advanceDetails, 
+      advanceAmount: entryData.advanceAmount,
       id: Date.now().toString(), 
       laborName: labor?.name || 'Unknown Labor',
       createdAt: new Date(),
@@ -100,4 +100,3 @@ export const useData = () => {
   }
   return context;
 };
-

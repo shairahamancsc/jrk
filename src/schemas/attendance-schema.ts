@@ -4,17 +4,11 @@ import { z } from 'zod';
 export const attendanceItemSchema = z.object({
   laborId: z.string(),
   laborName: z.string(),
-  status: z.enum(['present', 'absent', 'advance']).optional(),
-  advanceDetails: z.string().optional(), // Details for advance status
-}).refine(data => {
-  if (data.status === 'advance') {
-    // Ensure advanceDetails is present and not just whitespace if status is 'advance'
-    return data.advanceDetails && data.advanceDetails.trim() !== '';
-  }
-  return true; // Not 'advance' status, so no validation needed for advanceDetails here
-}, {
-  message: "Details required for advance", // This message will appear under the specific advanceDetails input
-  path: ['advanceDetails'], // Apply this error to the advanceDetails field of the item
+  status: z.enum(['present', 'absent']).optional(),
+  advanceAmount: z.preprocess(
+    (val) => (val === "" || val === undefined || val === null || (typeof val === 'string' && val.trim() === '') ? undefined : Number(val)),
+    z.number().min(0, { message: "Advance must be non-negative" }).optional()
+  ),
 });
 
 export const batchAttendanceSchema = z.object({
