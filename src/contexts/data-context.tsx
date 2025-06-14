@@ -74,10 +74,13 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   const addAttendanceEntry = (entryData: Omit<AttendanceEntry, 'id' | 'createdAt' | 'laborName'>) => {
     const labor = laborProfiles.find(lp => lp.id === entryData.laborId);
     const newEntry: AttendanceEntry = {
-      ...entryData,
+      laborId: entryData.laborId,
+      date: entryData.date,
+      status: entryData.status,
+      workDetails: entryData.workDetails || "",
+      advanceDetails: entryData.advanceDetails, 
       id: Date.now().toString(), 
       laborName: labor?.name || 'Unknown Labor',
-      workDetails: entryData.workDetails || "", // Ensure workDetails is at least an empty string
       createdAt: new Date(),
     };
     setAttendanceEntries((prev) => [...prev, newEntry]);
@@ -97,3 +100,4 @@ export const useData = () => {
   }
   return context;
 };
+

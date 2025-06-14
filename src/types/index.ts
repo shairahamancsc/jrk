@@ -18,6 +18,7 @@ export interface AttendanceEntry {
   laborName?: string; // For display purposes
   date: Date;
   status: AttendanceStatus;
-  workDetails?: string; // Made optional
+  workDetails?: string; // Common work details for the batch
+  advanceDetails?: string; // Specific details if status is 'advance'
   createdAt: Date;
 }

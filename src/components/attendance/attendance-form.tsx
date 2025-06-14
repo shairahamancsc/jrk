@@ -7,7 +7,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { batchAttendanceSchema, type BatchAttendanceFormData } from '@/schemas/attendance-schema';
 import { useData } from '@/contexts/data-context';
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea'; // Import Textarea
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
@@ -15,7 +16,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from "@/hooks/use-toast";
-import { CalendarCheck, CalendarIcon, Users, FileText } from 'lucide-react';
+import { CalendarCheck, CalendarIcon, Users, FileText,DollarSign } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import type { LaborProfile } from '@/types';
@@ -29,11 +30,12 @@ export function AttendanceForm() {
   const generateDefaultValues = useCallback((profiles: LaborProfile[], currentDate?: Date) => {
     return {
       date: currentDate || new Date(),
-      workDetails: "", // Default for shared work details
+      workDetails: "", 
       attendances: profiles.map(profile => ({
         laborId: profile.id,
         laborName: profile.name,
         status: undefined,
+        advanceDetails: "", 
       })),
     };
   }, []);
@@ -54,7 +56,7 @@ export function AttendanceForm() {
 
   const onSubmit = (data: BatchAttendanceFormData) => {
     let entriesRecordedCount = 0;
-    const sharedWorkDetails = data.workDetails || ""; // Get shared work details
+    const sharedWorkDetails = data.workDetails || ""; 
 
     data.attendances.forEach(att => {
       if (att.status) { 
@@ -62,7 +64,8 @@ export function AttendanceForm() {
           laborId: att.laborId,
           date: data.date,
           status: att.status,
-          workDetails: sharedWorkDetails, // Pass shared work details
+          workDetails: sharedWorkDetails,
+          advanceDetails: att.status === 'advance' ? att.advanceDetails : undefined,
         });
         entriesRecordedCount++;
       }
@@ -73,6 +76,7 @@ export function AttendanceForm() {
         title: "Attendance Recorded",
         description: `${entriesRecordedCount} attendance record(s) for ${format(data.date, "PPP")} have been processed.`,
       });
+      form.reset(generateDefaultValues(laborProfiles, new Date())); 
     } else {
        toast({
         variant: "destructive",
@@ -80,7 +84,6 @@ export function AttendanceForm() {
         description: "Please select a status for at least one labor.",
       });
     }
-    form.reset(generateDefaultValues(laborProfiles, new Date())); 
   };
 
   return (
@@ -90,7 +93,7 @@ export function AttendanceForm() {
           <CalendarCheck /> Record Daily Attendance
         </CardTitle>
         <CardDescription>
-          Select a date, mark attendance, and provide common work details for all marked entries.
+          Select a date, mark attendance, provide common work details, and specify advance details if applicable.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -148,6 +151,7 @@ export function AttendanceForm() {
                     <TableRow>
                       <TableHead className="w-[200px]">Labor Name</TableHead>
                       <TableHead className="w-[250px]">Status</TableHead>
+                      <TableHead>Advance Details</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -187,6 +191,30 @@ export function AttendanceForm() {
                               </FormItem>
                             )}
                           />
+                        </TableCell>
+                        <TableCell className="py-3 align-top">
+                          {form.watch(`attendances.${index}.status`) === 'advance' && (
+                            <FormField
+                              control={form.control}
+                              name={`attendances.${index}.advanceDetails`}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="sr-only">Advance Details for {item.laborName}</FormLabel>
+                                  <FormControl>
+                                    <div className="relative">
+                                    <DollarSign className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                                    <Input 
+                                      placeholder="Enter amount or details" 
+                                      {...field} 
+                                      className="pl-7 text-xs w-full max-w-[180px]" 
+                                    />
+                                    </div>
+                                  </FormControl>
+                                  <FormMessage className="text-xs" />
+                                </FormItem>
+                              )}
+                            />
+                          )}
                         </TableCell>
                       </TableRow>
                     ))}

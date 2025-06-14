@@ -38,9 +38,11 @@ export default function DashboardPage() {
           : true;
         
         const labor = laborProfiles.find(lp => lp.id === entry.laborId);
+        const lowerSearchTerm = searchTerm.toLowerCase();
         const matchesSearch = searchTerm ? 
-          (labor?.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-           (entry.workDetails || '').toLowerCase().includes(searchTerm.toLowerCase()))
+          (labor?.name.toLowerCase().includes(lowerSearchTerm) || 
+           (entry.workDetails || '').toLowerCase().includes(lowerSearchTerm) ||
+           (entry.status === 'advance' && (entry.advanceDetails || '').toLowerCase().includes(lowerSearchTerm)))
           : true;
 
         return isSameDate && matchesSearch;
@@ -55,6 +57,13 @@ export default function DashboardPage() {
       case 'advance': return 'bg-yellow-500 hover:bg-yellow-600 text-black';
       default: return 'bg-gray-500 hover:bg-gray-600';
     }
+  };
+
+  const getWorkDetailsDisplay = (entry: AttendanceEntry) => {
+    if (entry.status === 'advance') {
+      return `Advance: ${entry.advanceDetails || 'Details N/A'}`;
+    }
+    return entry.workDetails || 'N/A';
   };
   
   if (clientLoading) {
@@ -72,7 +81,7 @@ export default function DashboardPage() {
         <h1 className="text-3xl font-headline font-bold text-primary">Daily Attendance Dashboard</h1>
         <div className="flex items-center gap-2">
           <Input 
-            placeholder="Search by name or work..."
+            placeholder="Search by name, work, or advance..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="max-w-xs"
@@ -118,7 +127,7 @@ export default function DashboardPage() {
                     <TableHead>Labor Name</TableHead>
                     <TableHead>Date</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Work Details</TableHead>
+                    <TableHead>Details</TableHead>
                     <TableHead>Recorded At</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -134,7 +143,7 @@ export default function DashboardPage() {
                             {entry.status.charAt(0).toUpperCase() + entry.status.slice(1)}
                           </Badge>
                         </TableCell>
-                        <TableCell className="max-w-xs truncate">{entry.workDetails || 'N/A'}</TableCell>
+                        <TableCell className="max-w-xs truncate">{getWorkDetailsDisplay(entry)}</TableCell>
                         <TableCell>{format(new Date(entry.createdAt), "Pp")}</TableCell>
                       </TableRow>
                     );

@@ -36,6 +36,14 @@ export default function AttendancePage() {
     }
   };
 
+  const getWorkDetailsDisplay = (entry: AttendanceEntry) => {
+    if (entry.status === 'advance') {
+      return `Advance: ${entry.advanceDetails || 'Details N/A'}`;
+    }
+    return entry.workDetails || 'N/A';
+  };
+
+
   if (clientLoading) {
     return (
       <div className="flex h-[calc(100vh-theme(spacing.14)-2*theme(spacing.4))] items-center justify-center">
@@ -68,7 +76,7 @@ export default function AttendancePage() {
                     <TableHead>Labor Name</TableHead>
                     <TableHead>Date</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Work Details</TableHead>
+                    <TableHead>Details</TableHead>
                     <TableHead>Recorded At</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -84,7 +92,7 @@ export default function AttendancePage() {
                             {entry.status.charAt(0).toUpperCase() + entry.status.slice(1)}
                           </Badge>
                         </TableCell>
-                        <TableCell className="max-w-xs truncate">{entry.workDetails || 'N/A'}</TableCell>
+                        <TableCell className="max-w-xs truncate">{getWorkDetailsDisplay(entry)}</TableCell>
                         <TableCell>{format(new Date(entry.createdAt), "Pp")}</TableCell>
                       </TableRow>
                     );
