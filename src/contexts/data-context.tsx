@@ -21,12 +21,12 @@ const ATTENDANCE_ENTRIES_STORAGE_KEY = 'jrke_attendance_entries';
 export const DataProvider = ({ children }: { children: ReactNode }) => {
   const [laborProfiles, setLaborProfiles] = useState<LaborProfile[]>([]);
   const [attendanceEntries, setAttendanceEntries] = useState<AttendanceEntry[]>([]);
-  const [isLoading, setIsLoading] = useState(true); // Start true: loading on mount
+  const [isLoading, setIsLoading] = useState(true);
   const isInitialLoadComplete = useRef(false);
 
   // Effect for initial loading from localStorage
   useEffect(() => {
-    // setIsLoading(true); // Already true by default
+    setIsLoading(true); // Explicitly set loading true at the start of the effect.
 
     let profilesToSet: LaborProfile[] = [];
     try {
@@ -35,7 +35,9 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         const parsedProfiles = JSON.parse(storedLaborProfiles);
         if (Array.isArray(parsedProfiles)) {
           profilesToSet = parsedProfiles.map((p: any) => ({
-            ...p,
+            id: p.id || '', // Ensure basic fields exist
+            name: p.name || '',
+            contact: p.contact || '',
             // File fields should be strings (filenames or URLs) or undefined from localStorage
             photo: typeof p.photo === 'string' ? p.photo : undefined,
             aadhaar: typeof p.aadhaar === 'string' ? p.aadhaar : undefined,
@@ -44,13 +46,13 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
             createdAt: p.createdAt ? new Date(p.createdAt) : new Date(), // Ensure Date object
           }));
         } else {
-          console.warn("Stored labor profiles were not an array, clearing.");
-          localStorage.removeItem(LABOR_PROFILES_STORAGE_KEY);
+          console.warn(`Stored labor profiles (key: ${LABOR_PROFILES_STORAGE_KEY}) was not an array, clearing.`);
+          localStorage.removeItem(LABOR_PROFILES_STORAGE_KEY); // Clear corrupted item
         }
       }
     } catch (error) {
-      console.error("Error loading or parsing labor profiles from localStorage:", error);
-      localStorage.removeItem(LABOR_PROFILES_STORAGE_KEY);
+      console.error(`Error loading or parsing labor profiles from localStorage (key: ${LABOR_PROFILES_STORAGE_KEY}):`, error);
+      localStorage.removeItem(LABOR_PROFILES_STORAGE_KEY); // Clear corrupted item
     }
     setLaborProfiles(profilesToSet);
 
@@ -61,22 +63,27 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         const parsedEntries = JSON.parse(storedAttendanceEntries);
         if (Array.isArray(parsedEntries)) {
           entriesToSet = parsedEntries.map((e: any) => ({
-            ...e,
+            id: e.id || '', // Ensure basic fields exist
+            laborId: e.laborId || '',
+            laborName: e.laborName || 'Unknown Labor',
+            status: e.status as AttendanceStatus || 'absent', // Provide a default status
+            workDetails: typeof e.workDetails === 'string' ? e.workDetails : '',
+            advanceAmount: typeof e.advanceAmount === 'number' ? e.advanceAmount : undefined,
             date: e.date ? new Date(e.date) : new Date(), // Ensure Date object
             createdAt: e.createdAt ? new Date(e.createdAt) : new Date(), // Ensure Date object
           }));
         } else {
-          console.warn("Stored attendance entries were not an array, clearing.");
+          console.warn(`Stored attendance entries (key: ${ATTENDANCE_ENTRIES_STORAGE_KEY}) was not an array, clearing.`);
           localStorage.removeItem(ATTENDANCE_ENTRIES_STORAGE_KEY);
         }
       }
     } catch (error) {
-      console.error("Error loading or parsing attendance entries from localStorage:", error);
+      console.error(`Error loading or parsing attendance entries from localStorage (key: ${ATTENDANCE_ENTRIES_STORAGE_KEY}):`, error);
       localStorage.removeItem(ATTENDANCE_ENTRIES_STORAGE_KEY);
     }
     setAttendanceEntries(entriesToSet);
 
-    setIsLoading(false); // Loading is complete
+    setIsLoading(false);
     isInitialLoadComplete.current = true; // Mark initial load as complete *after* setting state
   }, []); // Empty dependency array: runs only once on mount
 
@@ -98,7 +105,8 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     try {
       localStorage.setItem(LABOR_PROFILES_STORAGE_KEY, JSON.stringify(profilesToSave));
     } catch (error) {
-      console.error("Failed to save labor profiles to localStorage", error);
+      console.error("Failed to save labor profiles to localStorage:", error);
+      // Consider how to handle quota exceeded or other storage errors.
     }
   }, [laborProfiles]); // Run when laborProfiles changes
 
@@ -116,7 +124,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     try {
       localStorage.setItem(ATTENDANCE_ENTRIES_STORAGE_KEY, JSON.stringify(entriesToSave));
     } catch (error) {
-      console.error("Failed to save attendance entries to localStorage", error);
+      console.error("Failed to save attendance entries to localStorage:", error);
     }
   }, [attendanceEntries]); // Run when attendanceEntries changes
 
@@ -159,3 +167,4 @@ export const useData = () => {
   }
   return context;
 };
+
