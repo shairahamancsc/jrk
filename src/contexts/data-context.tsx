@@ -2,7 +2,7 @@
 "use client";
 
 import type { ReactNode } from 'react';
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import type { LaborProfile, AttendanceEntry, AttendanceStatus } from '@/types';
 
 interface DataContextType {
@@ -22,6 +22,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   const [laborProfiles, setLaborProfiles] = useState<LaborProfile[]>([]);
   const [attendanceEntries, setAttendanceEntries] = useState<AttendanceEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const isInitialLoadComplete = useRef(false);
 
   useEffect(() => {
     setIsLoading(true);
@@ -73,46 +74,49 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     setAttendanceEntries(entriesToSet);
 
     setIsLoading(false);
+    isInitialLoadComplete.current = true;
   }, []);
 
   useEffect(() => {
-    if (isLoading) return; 
-
+    if (!isInitialLoadComplete.current) {
+      return;
+    }
     const profilesToSave = laborProfiles.map(profile => ({
       ...profile,
       photo: profile.photo instanceof File ? profile.photo.name : (typeof profile.photo === 'string' ? profile.photo : undefined),
       aadhaar: profile.aadhaar instanceof File ? profile.aadhaar.name : (typeof profile.aadhaar === 'string' ? profile.aadhaar : undefined),
       pan: profile.pan instanceof File ? profile.pan.name : (typeof profile.pan === 'string' ? profile.pan : undefined),
       drivingLicense: profile.drivingLicense instanceof File ? profile.drivingLicense.name : (typeof profile.drivingLicense === 'string' ? profile.drivingLicense : undefined),
-      createdAt: profile.createdAt instanceof Date ? profile.createdAt.toISOString() : new Date().toISOString(),
+      createdAt: profile.createdAt.toISOString(), 
     }));
     try {
       localStorage.setItem(LABOR_PROFILES_STORAGE_KEY, JSON.stringify(profilesToSave));
     } catch (error) {
       console.error("Failed to save labor profiles to localStorage", error);
     }
-  }, [laborProfiles, isLoading]);
+  }, [laborProfiles]);
 
   useEffect(() => {
-     if (isLoading) return; 
-
-      const entriesToSave = attendanceEntries.map(entry => ({
-        ...entry,
-        date: entry.date instanceof Date ? entry.date.toISOString() : new Date().toISOString(),
-        createdAt: entry.createdAt instanceof Date ? entry.createdAt.toISOString() : new Date().toISOString(),
-      }));
-      try {
-        localStorage.setItem(ATTENDANCE_ENTRIES_STORAGE_KEY, JSON.stringify(entriesToSave));
-      } catch (error) {
-        console.error("Failed to save attendance entries to localStorage", error);
-      }
-  }, [attendanceEntries, isLoading]);
+    if (!isInitialLoadComplete.current) {
+      return;
+    }
+    const entriesToSave = attendanceEntries.map(entry => ({
+      ...entry,
+      date: entry.date.toISOString(),
+      createdAt: entry.createdAt.toISOString(),
+    }));
+    try {
+      localStorage.setItem(ATTENDANCE_ENTRIES_STORAGE_KEY, JSON.stringify(entriesToSave));
+    } catch (error) {
+      console.error("Failed to save attendance entries to localStorage", error);
+    }
+  }, [attendanceEntries]);
 
 
   const addLaborProfile = (profileData: Omit<LaborProfile, 'id' | 'createdAt'>) => {
     const newProfile: LaborProfile = {
       ...profileData,
-      id: Date.now().toString() + Math.random().toString(36).substring(2, 9), 
+      id: Date.now().toString() + Math.random().toString(36).substring(2, 9),
       createdAt: new Date(),
     };
     setLaborProfiles((prev) => [...prev, newProfile]);
@@ -126,7 +130,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       status: entryData.status,
       workDetails: entryData.workDetails || "",
       advanceAmount: entryData.advanceAmount,
-      id: Date.now().toString() + Math.random().toString(36).substring(2, 9), 
+      id: Date.now().toString() + Math.random().toString(36).substring(2, 9),
       laborName: labor?.name || 'Unknown Labor',
       createdAt: new Date(),
     };
@@ -147,3 +151,4 @@ export const useData = () => {
   }
   return context;
 };
+
