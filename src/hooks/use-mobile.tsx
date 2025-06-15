@@ -1,29 +1,30 @@
-import * as React from "react"
 
-const MOBILE_BREAKPOINT = 768
+import { useState, useEffect } from "react";
+
+const MOBILE_BREAKPOINT = 768;
 
 export function useIsMobile() {
-  const [isMobile, setIsMobile] = React.useState<boolean | undefined>(undefined)
+  // Initialize state to a default (e.g., false).
+  // This ensures server and initial client render are consistent.
+  const [isMobile, setIsMobile] = useState(false);
 
-  React.useEffect(() => {
-    // Ensure window is defined (runs only on client-side)
-    if (typeof window === "undefined") {
-      setIsMobile(false); // Default to false or handle as needed for SSR
-      return;
-    }
+  useEffect(() => {
+    // This effect runs only on the client side after hydration.
+    const checkDevice = () => {
+      setIsMobile(window.innerWidth < MOBILE_BREAKPOINT);
+    };
 
-    const mql = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`)
-    const onChange = () => {
-      setIsMobile(window.innerWidth < MOBILE_BREAKPOINT)
-    }
+    // Check on mount to set the actual value based on client's window size.
+    checkDevice();
     
-    mql.addEventListener("change", onChange)
-    // Set initial state
-    setIsMobile(window.innerWidth < MOBILE_BREAKPOINT)
-    
-    return () => mql.removeEventListener("change", onChange)
-  }, [])
+    // Add event listener for resize
+    window.addEventListener('resize', checkDevice);
 
-  return !!isMobile
+    // Cleanup listener on unmount
+    return () => {
+      window.removeEventListener('resize', checkDevice);
+    };
+  }, []); // Empty dependency array: run once on mount, cleanup on unmount.
+
+  return isMobile;
 }
-
