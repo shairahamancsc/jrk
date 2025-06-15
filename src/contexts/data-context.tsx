@@ -18,6 +18,26 @@ const DataContext = createContext<DataContextType | undefined>(undefined);
 const LABOR_PROFILES_STORAGE_KEY = 'jrke_labor_profiles';
 const ATTENDANCE_ENTRIES_STORAGE_KEY = 'jrke_attendance_entries';
 
+// Helper to process file fields when loading from localStorage
+const processLoadedFileField = (fieldValue: any): string | undefined => {
+  if (typeof fieldValue === 'string' && fieldValue.trim() !== '') {
+    return fieldValue;
+  }
+  return undefined;
+};
+
+// Helper to process file fields when saving to localStorage
+const processFileFieldForSaving = (fieldValue: File | string | undefined): string | undefined => {
+  if (fieldValue instanceof File) {
+    return fieldValue.name;
+  }
+  if (typeof fieldValue === 'string' && fieldValue.trim() !== '') {
+    return fieldValue;
+  }
+  return undefined;
+};
+
+
 export const DataProvider = ({ children }: { children: ReactNode }) => {
   const [laborProfiles, setLaborProfiles] = useState<LaborProfile[]>([]);
   const [attendanceEntries, setAttendanceEntries] = useState<AttendanceEntry[]>([]);
@@ -27,6 +47,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     let profilesToSet: LaborProfile[] = [];
     let entriesToSet: AttendanceEntry[] = [];
 
+    // Load Labor Profiles
     try {
       const storedLaborProfiles = localStorage.getItem(LABOR_PROFILES_STORAGE_KEY);
       if (storedLaborProfiles) {
@@ -34,11 +55,11 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         if (Array.isArray(parsedProfiles)) {
           profilesToSet = parsedProfiles.map((p: any) => ({
             ...p,
-            photo: (typeof p.photo === 'object' && p.photo !== null && Object.keys(p.photo).length === 0) ? undefined : p.photo,
-            aadhaar: (typeof p.aadhaar === 'object' && p.aadhaar !== null && Object.keys(p.aadhaar).length === 0) ? undefined : p.aadhaar,
-            pan: (typeof p.pan === 'object' && p.pan !== null && Object.keys(p.pan).length === 0) ? undefined : p.pan,
-            drivingLicense: (typeof p.drivingLicense === 'object' && p.drivingLicense !== null && Object.keys(p.drivingLicense).length === 0) ? undefined : p.drivingLicense,
-            createdAt: p.createdAt ? new Date(p.createdAt) : new Date(),
+            photo: processLoadedFileField(p.photo),
+            aadhaar: processLoadedFileField(p.aadhaar),
+            pan: processLoadedFileField(p.pan),
+            drivingLicense: processLoadedFileField(p.drivingLicense),
+            createdAt: p.createdAt ? new Date(p.createdAt) : new Date(), // Handles ISO string or creates new
           }));
         } else {
           console.warn("Stored labor profiles were not an array, clearing.");
@@ -51,6 +72,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     }
     setLaborProfiles(profilesToSet);
 
+    // Load Attendance Entries
     try {
       const storedAttendanceEntries = localStorage.getItem(ATTENDANCE_ENTRIES_STORAGE_KEY);
       if (storedAttendanceEntries) {
@@ -58,8 +80,8 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         if (Array.isArray(parsedEntries)) {
           entriesToSet = parsedEntries.map((e: any) => ({
             ...e,
-            date: e.date ? new Date(e.date) : new Date(),
-            createdAt: e.createdAt ? new Date(e.createdAt) : new Date(),
+            date: e.date ? new Date(e.date) : new Date(), // Handles ISO string or creates new
+            createdAt: e.createdAt ? new Date(e.createdAt) : new Date(), // Handles ISO string or creates new
           }));
         } else {
           console.warn("Stored attendance entries were not an array, clearing.");
@@ -73,17 +95,19 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     setAttendanceEntries(entriesToSet);
 
     setIsLoading(false);
-  }, []);
+  }, []); // Empty dependency array ensures this runs only once on mount
 
+  // Save Labor Profiles
   useEffect(() => {
     if (isLoading) return; 
 
     const profilesToSave = laborProfiles.map(profile => ({
       ...profile,
-      photo: profile.photo instanceof File ? profile.photo.name : profile.photo,
-      aadhaar: profile.aadhaar instanceof File ? profile.aadhaar.name : profile.aadhaar,
-      pan: profile.pan instanceof File ? profile.pan.name : profile.pan,
-      drivingLicense: profile.drivingLicense instanceof File ? profile.drivingLicense.name : profile.drivingLicense,
+      photo: processFileFieldForSaving(profile.photo),
+      aadhaar: processFileFieldForSaving(profile.aadhaar),
+      pan: processFileFieldForSaving(profile.pan),
+      drivingLicense: processFileFieldForSaving(profile.drivingLicense),
+      createdAt: profile.createdAt instanceof Date ? profile.createdAt.toISOString() : new Date().toISOString(),
     }));
     try {
       localStorage.setItem(LABOR_PROFILES_STORAGE_KEY, JSON.stringify(profilesToSave));
@@ -92,10 +116,17 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [laborProfiles, isLoading]);
 
+  // Save Attendance Entries
   useEffect(() => {
      if (isLoading) return; 
+
+      const entriesToSave = attendanceEntries.map(entry => ({
+        ...entry,
+        date: entry.date instanceof Date ? entry.date.toISOString() : new Date().toISOString(),
+        createdAt: entry.createdAt instanceof Date ? entry.createdAt.toISOString() : new Date().toISOString(),
+      }));
       try {
-        localStorage.setItem(ATTENDANCE_ENTRIES_STORAGE_KEY, JSON.stringify(attendanceEntries));
+        localStorage.setItem(ATTENDANCE_ENTRIES_STORAGE_KEY, JSON.stringify(entriesToSave));
       } catch (error) {
         console.error("Failed to save attendance entries to localStorage", error);
       }
@@ -105,7 +136,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   const addLaborProfile = (profileData: Omit<LaborProfile, 'id' | 'createdAt'>) => {
     const newProfile: LaborProfile = {
       ...profileData,
-      id: Date.now().toString(), 
+      id: Date.now().toString() + Math.random().toString(36).substring(2, 9), 
       createdAt: new Date(),
     };
     setLaborProfiles((prev) => [...prev, newProfile]);
@@ -119,7 +150,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       status: entryData.status,
       workDetails: entryData.workDetails || "",
       advanceAmount: entryData.advanceAmount,
-      id: Date.now().toString(), 
+      id: Date.now().toString() + Math.random().toString(36).substring(2, 9), 
       laborName: labor?.name || 'Unknown Labor',
       createdAt: new Date(),
     };
