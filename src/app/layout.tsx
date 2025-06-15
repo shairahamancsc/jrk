@@ -3,6 +3,7 @@ import './globals.css';
 import { AuthProvider } from '@/contexts/auth-context';
 import { DataProvider } from '@/contexts/data-context';
 import { Toaster } from "@/components/ui/toaster";
+import { Analytics } from "@vercel/analytics/next"
 
 export const metadata: Metadata = {
   title: 'JRKE Attendance MVP',

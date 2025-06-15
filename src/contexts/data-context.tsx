@@ -21,11 +21,13 @@ const ATTENDANCE_ENTRIES_STORAGE_KEY = 'jrke_attendance_entries';
 export const DataProvider = ({ children }: { children: ReactNode }) => {
   const [laborProfiles, setLaborProfiles] = useState<LaborProfile[]>([]);
   const [attendanceEntries, setAttendanceEntries] = useState<AttendanceEntry[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true); // Start true: loading on mount
   const isInitialLoadComplete = useRef(false);
 
+  // Effect for initial loading from localStorage
   useEffect(() => {
-    setIsLoading(true);
+    // setIsLoading(true); // Already true by default
+
     let profilesToSet: LaborProfile[] = [];
     try {
       const storedLaborProfiles = localStorage.getItem(LABOR_PROFILES_STORAGE_KEY);
@@ -34,11 +36,12 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         if (Array.isArray(parsedProfiles)) {
           profilesToSet = parsedProfiles.map((p: any) => ({
             ...p,
+            // File fields should be strings (filenames or URLs) or undefined from localStorage
             photo: typeof p.photo === 'string' ? p.photo : undefined,
             aadhaar: typeof p.aadhaar === 'string' ? p.aadhaar : undefined,
             pan: typeof p.pan === 'string' ? p.pan : undefined,
             drivingLicense: typeof p.drivingLicense === 'string' ? p.drivingLicense : undefined,
-            createdAt: p.createdAt ? new Date(p.createdAt) : new Date(),
+            createdAt: p.createdAt ? new Date(p.createdAt) : new Date(), // Ensure Date object
           }));
         } else {
           console.warn("Stored labor profiles were not an array, clearing.");
@@ -59,8 +62,8 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         if (Array.isArray(parsedEntries)) {
           entriesToSet = parsedEntries.map((e: any) => ({
             ...e,
-            date: e.date ? new Date(e.date) : new Date(),
-            createdAt: e.createdAt ? new Date(e.createdAt) : new Date(),
+            date: e.date ? new Date(e.date) : new Date(), // Ensure Date object
+            createdAt: e.createdAt ? new Date(e.createdAt) : new Date(), // Ensure Date object
           }));
         } else {
           console.warn("Stored attendance entries were not an array, clearing.");
@@ -73,44 +76,49 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     }
     setAttendanceEntries(entriesToSet);
 
-    setIsLoading(false);
-    isInitialLoadComplete.current = true;
-  }, []);
+    setIsLoading(false); // Loading is complete
+    isInitialLoadComplete.current = true; // Mark initial load as complete *after* setting state
+  }, []); // Empty dependency array: runs only once on mount
 
+  // Effect for saving laborProfiles to localStorage
   useEffect(() => {
     if (!isInitialLoadComplete.current) {
+      // Only save after the initial load from localStorage is complete
       return;
     }
     const profilesToSave = laborProfiles.map(profile => ({
       ...profile,
+      // For File objects, store their name. For strings (URLs/filenames), store as is.
       photo: profile.photo instanceof File ? profile.photo.name : (typeof profile.photo === 'string' ? profile.photo : undefined),
       aadhaar: profile.aadhaar instanceof File ? profile.aadhaar.name : (typeof profile.aadhaar === 'string' ? profile.aadhaar : undefined),
       pan: profile.pan instanceof File ? profile.pan.name : (typeof profile.pan === 'string' ? profile.pan : undefined),
       drivingLicense: profile.drivingLicense instanceof File ? profile.drivingLicense.name : (typeof profile.drivingLicense === 'string' ? profile.drivingLicense : undefined),
-      createdAt: profile.createdAt.toISOString(), 
+      createdAt: profile.createdAt.toISOString(), // Save dates as ISO strings
     }));
     try {
       localStorage.setItem(LABOR_PROFILES_STORAGE_KEY, JSON.stringify(profilesToSave));
     } catch (error) {
       console.error("Failed to save labor profiles to localStorage", error);
     }
-  }, [laborProfiles]);
+  }, [laborProfiles]); // Run when laborProfiles changes
 
+  // Effect for saving attendanceEntries to localStorage
   useEffect(() => {
     if (!isInitialLoadComplete.current) {
+      // Only save after the initial load from localStorage is complete
       return;
     }
     const entriesToSave = attendanceEntries.map(entry => ({
       ...entry,
-      date: entry.date.toISOString(),
-      createdAt: entry.createdAt.toISOString(),
+      date: entry.date.toISOString(), // Save dates as ISO strings
+      createdAt: entry.createdAt.toISOString(), // Save dates as ISO strings
     }));
     try {
       localStorage.setItem(ATTENDANCE_ENTRIES_STORAGE_KEY, JSON.stringify(entriesToSave));
     } catch (error) {
       console.error("Failed to save attendance entries to localStorage", error);
     }
-  }, [attendanceEntries]);
+  }, [attendanceEntries]); // Run when attendanceEntries changes
 
 
   const addLaborProfile = (profileData: Omit<LaborProfile, 'id' | 'createdAt'>) => {
@@ -151,4 +159,3 @@ export const useData = () => {
   }
   return context;
 };
-
