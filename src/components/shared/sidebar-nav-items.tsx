@@ -8,6 +8,7 @@ import {
   Users,
   CalendarCheck,
   LogOut,
+  BugPlay, // Added icon for Code Fixer
 } from 'lucide-react';
 import {
   SidebarMenu,
@@ -21,6 +22,7 @@ const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/labor', label: 'Labor Profiles', icon: Users },
   { href: '/attendance', label: 'Daily Attendance', icon: CalendarCheck },
+  { href: '/code-fixer', label: 'AI Code Fixer', icon: BugPlay }, // New item
 ];
 
 export function SidebarNavItems() {
