@@ -18,36 +18,14 @@ const DataContext = createContext<DataContextType | undefined>(undefined);
 const LABOR_PROFILES_STORAGE_KEY = 'jrke_labor_profiles';
 const ATTENDANCE_ENTRIES_STORAGE_KEY = 'jrke_attendance_entries';
 
-// Helper to process file fields when loading from localStorage
-const processLoadedFileField = (fieldValue: any): string | undefined => {
-  if (typeof fieldValue === 'string' && fieldValue.trim() !== '') {
-    return fieldValue;
-  }
-  return undefined;
-};
-
-// Helper to process file fields when saving to localStorage
-const processFileFieldForSaving = (fieldValue: File | string | undefined): string | undefined => {
-  if (fieldValue instanceof File) {
-    return fieldValue.name;
-  }
-  if (typeof fieldValue === 'string' && fieldValue.trim() !== '') {
-    return fieldValue;
-  }
-  return undefined;
-};
-
-
 export const DataProvider = ({ children }: { children: ReactNode }) => {
   const [laborProfiles, setLaborProfiles] = useState<LaborProfile[]>([]);
   const [attendanceEntries, setAttendanceEntries] = useState<AttendanceEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    setIsLoading(true);
     let profilesToSet: LaborProfile[] = [];
-    let entriesToSet: AttendanceEntry[] = [];
-
-    // Load Labor Profiles
     try {
       const storedLaborProfiles = localStorage.getItem(LABOR_PROFILES_STORAGE_KEY);
       if (storedLaborProfiles) {
@@ -55,11 +33,11 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         if (Array.isArray(parsedProfiles)) {
           profilesToSet = parsedProfiles.map((p: any) => ({
             ...p,
-            photo: processLoadedFileField(p.photo),
-            aadhaar: processLoadedFileField(p.aadhaar),
-            pan: processLoadedFileField(p.pan),
-            drivingLicense: processLoadedFileField(p.drivingLicense),
-            createdAt: p.createdAt ? new Date(p.createdAt) : new Date(), // Handles ISO string or creates new
+            photo: typeof p.photo === 'string' ? p.photo : undefined,
+            aadhaar: typeof p.aadhaar === 'string' ? p.aadhaar : undefined,
+            pan: typeof p.pan === 'string' ? p.pan : undefined,
+            drivingLicense: typeof p.drivingLicense === 'string' ? p.drivingLicense : undefined,
+            createdAt: p.createdAt ? new Date(p.createdAt) : new Date(),
           }));
         } else {
           console.warn("Stored labor profiles were not an array, clearing.");
@@ -72,7 +50,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     }
     setLaborProfiles(profilesToSet);
 
-    // Load Attendance Entries
+    let entriesToSet: AttendanceEntry[] = [];
     try {
       const storedAttendanceEntries = localStorage.getItem(ATTENDANCE_ENTRIES_STORAGE_KEY);
       if (storedAttendanceEntries) {
@@ -80,8 +58,8 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         if (Array.isArray(parsedEntries)) {
           entriesToSet = parsedEntries.map((e: any) => ({
             ...e,
-            date: e.date ? new Date(e.date) : new Date(), // Handles ISO string or creates new
-            createdAt: e.createdAt ? new Date(e.createdAt) : new Date(), // Handles ISO string or creates new
+            date: e.date ? new Date(e.date) : new Date(),
+            createdAt: e.createdAt ? new Date(e.createdAt) : new Date(),
           }));
         } else {
           console.warn("Stored attendance entries were not an array, clearing.");
@@ -95,18 +73,17 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     setAttendanceEntries(entriesToSet);
 
     setIsLoading(false);
-  }, []); // Empty dependency array ensures this runs only once on mount
+  }, []);
 
-  // Save Labor Profiles
   useEffect(() => {
     if (isLoading) return; 
 
     const profilesToSave = laborProfiles.map(profile => ({
       ...profile,
-      photo: processFileFieldForSaving(profile.photo),
-      aadhaar: processFileFieldForSaving(profile.aadhaar),
-      pan: processFileFieldForSaving(profile.pan),
-      drivingLicense: processFileFieldForSaving(profile.drivingLicense),
+      photo: profile.photo instanceof File ? profile.photo.name : (typeof profile.photo === 'string' ? profile.photo : undefined),
+      aadhaar: profile.aadhaar instanceof File ? profile.aadhaar.name : (typeof profile.aadhaar === 'string' ? profile.aadhaar : undefined),
+      pan: profile.pan instanceof File ? profile.pan.name : (typeof profile.pan === 'string' ? profile.pan : undefined),
+      drivingLicense: profile.drivingLicense instanceof File ? profile.drivingLicense.name : (typeof profile.drivingLicense === 'string' ? profile.drivingLicense : undefined),
       createdAt: profile.createdAt instanceof Date ? profile.createdAt.toISOString() : new Date().toISOString(),
     }));
     try {
@@ -116,7 +93,6 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [laborProfiles, isLoading]);
 
-  // Save Attendance Entries
   useEffect(() => {
      if (isLoading) return; 
 

@@ -22,35 +22,43 @@ export default function AllLaborPage() {
 
   const getFileDisplay = (file?: File | string) => {
     if (!file) return <span className="text-muted-foreground text-xs">Not Provided</span>;
+    
     if (typeof file === 'string') {
       if (file.startsWith('https://placehold.co') || file.startsWith('http')) {
          return <Image src={file} alt="document" width={20} height={20} data-ai-hint="document icon" className="rounded" />;
       }
-      // Display filename if it's just a string (persisted from File object)
+      // It's a filename string
       return <span className="text-xs flex items-center gap-1"><FileText size={14} /> {file}</span>;
     }
+    
     // If it's a File object (only available before saving to localStorage or if not reloaded yet)
-    return (
-      <a
-        href={URL.createObjectURL(file)}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="text-accent hover:underline flex items-center gap-1 text-xs"
-      >
-        <FileText size={14} /> View Document
-      </a>
-    );
+    if (file instanceof File) {
+      return (
+        <a
+          href={URL.createObjectURL(file)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-accent hover:underline flex items-center gap-1 text-xs"
+        >
+          <FileText size={14} /> View Document
+        </a>
+      );
+    }
+    return <span className="text-muted-foreground text-xs">Invalid File Data</span>;
   };
 
-  const getAvatarSrc = (photo: File | string | undefined): string => {
+  const getAvatarSrc = (photo?: File | string): string => {
     if (!photo) return '';
     if (typeof photo === 'string') {
-      // Only return string if it's a valid URL for an image
-      if (photo.startsWith('http') || photo.startsWith('data:image') || photo.startsWith('https://placehold.co')) return photo;
-      return ''; // Otherwise, fallback (e.g. if it's a filename string)
+      if (photo.startsWith('http') || photo.startsWith('data:image') || photo.startsWith('https://placehold.co')) {
+        return photo;
+      }
+      return ''; // Filename string, cannot be used as src, trigger fallback
     }
-    // If it's a File object
-    return URL.createObjectURL(photo);
+    if (photo instanceof File) {
+      return URL.createObjectURL(photo);
+    }
+    return '';
   }
   
   if (clientLoading) {
@@ -70,7 +78,6 @@ export default function AllLaborPage() {
         </p>
       </div>
       
-
       <Card className="shadow-xl">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-2xl text-primary font-headline">
@@ -115,7 +122,7 @@ export default function AllLaborPage() {
                       <TableCell>{getFileDisplay(profile.aadhaar)}</TableCell>
                       <TableCell>{getFileDisplay(profile.pan)}</TableCell>
                       <TableCell>{getFileDisplay(profile.drivingLicense)}</TableCell>
-                      <TableCell className="text-sm">{format(new Date(profile.createdAt), "PP")}</TableCell>
+                      <TableCell className="text-sm">{profile.createdAt ? format(new Date(profile.createdAt), "PP") : 'N/A'}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
