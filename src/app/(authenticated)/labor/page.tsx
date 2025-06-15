@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -22,18 +23,36 @@ export default function LaborPage() {
 
   const getFileDisplay = (file?: File | string) => {
     if (!file) return <span className="text-muted-foreground text-xs">Not Provided</span>;
-    if (typeof file === 'string') return <Image src={file} alt="document" width={20} height={20} data-ai-hint="document icon" className="rounded" />; // placeholder
+    if (typeof file === 'string') {
+      if (file.startsWith('https://placehold.co') || file.startsWith('http')) {
+         return <Image src={file} alt="document" width={20} height={20} data-ai-hint="document icon" className="rounded" />;
+      }
+      // Display filename if it's just a string (persisted from File object)
+      return <span className="text-xs flex items-center gap-1"><FileText size={14} /> {file}</span>;
+    }
+    // If it's a File object (only available before saving to localStorage or if not reloaded yet)
     return (
-      <a 
-        href={URL.createObjectURL(file)} 
-        target="_blank" 
+      <a
+        href={URL.createObjectURL(file)}
+        target="_blank"
         rel="noopener noreferrer"
         className="text-accent hover:underline flex items-center gap-1 text-xs"
       >
-        <FileText size={14} /> View
+        <FileText size={14} /> View Document
       </a>
     );
   };
+
+  const getAvatarSrc = (photo: File | string | undefined): string => {
+    if (!photo) return '';
+    if (typeof photo === 'string') {
+      // Only return string if it's a valid URL for an image
+      if (photo.startsWith('http') || photo.startsWith('data:image') || photo.startsWith('https://placehold.co')) return photo;
+      return ''; // Otherwise, fallback (e.g. if it's a filename string)
+    }
+    // If it's a File object
+    return URL.createObjectURL(photo);
+  }
   
   if (clientLoading) {
     return (
@@ -79,7 +98,7 @@ export default function LaborPage() {
                       <TableCell>
                         <Avatar className="h-10 w-10">
                           <AvatarImage 
-                            src={profile.photo && typeof profile.photo !== 'string' ? URL.createObjectURL(profile.photo as File) : (profile.photo as string || '')} 
+                            src={getAvatarSrc(profile.photo)}
                             alt={profile.name} 
                             data-ai-hint="profile person"
                           />

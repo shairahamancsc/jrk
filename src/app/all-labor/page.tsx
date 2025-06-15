@@ -22,18 +22,18 @@ export default function AllLaborPage() {
 
   const getFileDisplay = (file?: File | string) => {
     if (!file) return <span className="text-muted-foreground text-xs">Not Provided</span>;
-    if (typeof file === 'string') { // Assuming string means it's a placeholder or an external URL
-      if (file.startsWith('https://placehold.co') || file.startsWith('http')) { // Check if it's a URL
+    if (typeof file === 'string') {
+      if (file.startsWith('https://placehold.co') || file.startsWith('http')) {
          return <Image src={file} alt="document" width={20} height={20} data-ai-hint="document icon" className="rounded" />;
       }
-      // If it's a string but not a URL, it might be a name or other identifier, display as text.
-      return <span className="text-xs">{file}</span>;
+      // Display filename if it's just a string (persisted from File object)
+      return <span className="text-xs flex items-center gap-1"><FileText size={14} /> {file}</span>;
     }
-    // If it's a File object
+    // If it's a File object (only available before saving to localStorage or if not reloaded yet)
     return (
-      <a 
-        href={URL.createObjectURL(file)} 
-        target="_blank" 
+      <a
+        href={URL.createObjectURL(file)}
+        target="_blank"
         rel="noopener noreferrer"
         className="text-accent hover:underline flex items-center gap-1 text-xs"
       >
@@ -41,6 +41,17 @@ export default function AllLaborPage() {
       </a>
     );
   };
+
+  const getAvatarSrc = (photo: File | string | undefined): string => {
+    if (!photo) return '';
+    if (typeof photo === 'string') {
+      // Only return string if it's a valid URL for an image
+      if (photo.startsWith('http') || photo.startsWith('data:image') || photo.startsWith('https://placehold.co')) return photo;
+      return ''; // Otherwise, fallback (e.g. if it's a filename string)
+    }
+    // If it's a File object
+    return URL.createObjectURL(photo);
+  }
   
   if (clientLoading) {
     return (
@@ -90,7 +101,7 @@ export default function AllLaborPage() {
                       <TableCell>
                         <Avatar className="h-12 w-12">
                           <AvatarImage 
-                            src={profile.photo && typeof profile.photo !== 'string' ? URL.createObjectURL(profile.photo as File) : (profile.photo as string || '')} 
+                            src={getAvatarSrc(profile.photo)}
                             alt={profile.name}
                             data-ai-hint="profile person"
                           />
@@ -118,4 +129,3 @@ export default function AllLaborPage() {
     </div>
   );
 }
-
