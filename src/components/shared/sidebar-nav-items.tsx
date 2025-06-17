@@ -8,6 +8,7 @@ import {
   Users,
   CalendarCheck,
   LogOut,
+  UserPlus, // Added for Add Supervisor
 } from 'lucide-react';
 import {
   SidebarMenu,
@@ -17,20 +18,29 @@ import {
 import { useAuth } from '@/contexts/auth-context';
 import { Button } from '@/components/ui/button';
 
-const navItems = [
+const navItemsBase = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/labor', label: 'Labor Profiles', icon: Users },
   { href: '/attendance', label: 'Daily Attendance', icon: CalendarCheck },
 ];
 
+const adminNavItems = [
+  { href: '/admin/add-supervisor', label: 'Add Supervisor', icon: UserPlus },
+];
+
 export function SidebarNavItems() {
   const pathname = usePathname();
-  const { logout } = useAuth();
+  const { logout, userRole } = useAuth();
+
+  const currentNavItems = [
+    ...navItemsBase,
+    ...(userRole === 'admin' ? adminNavItems : []),
+  ];
 
   return (
     <>
       <SidebarMenu>
-        {navItems.map((item) => (
+        {currentNavItems.map((item) => (
           <SidebarMenuItem key={item.label}>
             <SidebarMenuButton
               asChild

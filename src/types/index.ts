@@ -1,4 +1,7 @@
 
+
+export type UserRole = 'admin' | 'supervisor';
+
 export interface LaborProfile {
   id: string; // Typically UUID from Supabase
   name: string;

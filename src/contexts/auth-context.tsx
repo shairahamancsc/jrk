@@ -8,12 +8,14 @@ import { supabase } from '@/lib/supabase/client';
 import type { Session, User, AuthChangeEvent, Subscription } from '@supabase/supabase-js';
 import type { LoginFormData } from '@/schemas/auth-schema';
 import { useToast } from "@/hooks/use-toast";
+import type { UserRole } from '@/types';
 
 
 interface AuthContextType {
   isAuthenticated: boolean;
   user: User | null;
   session: Session | null;
+  userRole: UserRole | null;
   login: (credentials: LoginFormData) => Promise<void>;
   logout: () => Promise<void>;
   isLoading: boolean;
@@ -24,19 +26,20 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
+  const [userRole, setUserRole] = useState<UserRole | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true); // isLoading for initial auth check
   const router = useRouter();
   const pathname = usePathname();
   const { toast } = useToast();
 
   useEffect(() => {
-    setIsLoading(true);
     console.log('[AuthContext] Setting up auth listener and initial check.');
+    setIsLoading(true);
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event: AuthChangeEvent, newSession: Session | null) => {
-        const currentPath = window.location.pathname; // Get current pathname directly
+        const currentPath = window.location.pathname;
         console.log('[AuthContext] Auth state change event:', event, 'on path:', currentPath, 'New session:', newSession);
         
         setSession(newSession);
@@ -44,10 +47,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(currentUser);
         setIsAuthenticated(!!currentUser);
 
+        const roleFromMetadata = currentUser?.user_metadata?.role;
+        if (roleFromMetadata === 'admin' || roleFromMetadata === 'supervisor') {
+          setUserRole(roleFromMetadata);
+        } else {
+          setUserRole(null);
+        }
+        
         // This 'isLoading' check ensures this block only runs for the initial auth state determination.
-        if (isLoading) {
+        if (isLoading) { // Only act on isLoading if it's currently true
           setIsLoading(false); 
-          console.log('[AuthContext] Initial auth state determined. isLoading: false');
+          console.log('[AuthContext] Initial auth state determined by listener. isLoading: false');
           if (currentUser) {
             if (currentPath === '/login' || currentPath === '/') {
               console.log('[AuthContext] User authenticated on login/root, redirecting to /dashboard');
@@ -60,12 +70,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
           }
         } else {
-          // Handle subsequent auth changes (e.g., user logs out from another tab, token refresh, etc.)
+           // Handle subsequent auth changes (e.g., user logs out from another tab, token refresh, etc.)
           if (event === 'SIGNED_IN') {
             if (currentPath === '/login' || currentPath === '/') {
                router.replace('/dashboard');
             }
           } else if (event === 'SIGNED_OUT') {
+            // If already on login or all-labor, no redirect needed. Otherwise, go to login.
             if (currentPath !== '/login' && currentPath !== '/all-labor') {
               router.replace('/login');
             }
@@ -76,7 +87,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     // Check initial session state more robustly.
     const checkInitialSession = async () => {
-      if (isLoading) { 
+      if (isLoading) { // Only run if still in initial loading phase
         console.log('[AuthContext] Performing initial session check.');
         const { data: { session: initialSession }, error: sessionError } = await supabase.auth.getSession();
         const currentPath = window.location.pathname;
@@ -91,6 +102,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           const initialUser = initialSession?.user ?? null;
           setUser(initialUser);
           setIsAuthenticated(!!initialUser);
+
+          const roleFromMetadata = initialUser?.user_metadata?.role;
+          if (roleFromMetadata === 'admin' || roleFromMetadata === 'supervisor') {
+            setUserRole(roleFromMetadata);
+          } else {
+            setUserRole(null);
+          }
+
           setIsLoading(false); 
           console.log('[AuthContext] Initial session check complete. isLoading: false');
 
@@ -118,11 +137,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []); // Empty dependency array ensures this runs only once on mount.
 
   const login = async (credentials: LoginFormData) => {
+    // isLoading state in AuthContext is for initial load, not for login button state.
+    // Login page will manage its own submission state.
     const { error, data: loginData } = await supabase.auth.signInWithPassword({
       email: credentials.email,
       password: credentials.password,
       options: {
-        captchaToken: credentials.captchaToken, // Pass CAPTCHA token to Supabase
+        captchaToken: credentials.captchaToken,
       }
     });
 
@@ -136,10 +157,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       throw error; 
     } else if (loginData?.user) {
       toast({
-        title: "Login Attempt Successful",
-        description: "Checking session and redirecting...",
+        title: "Login Successful",
+        description: "Redirecting...",
       });
-      // onAuthStateChange will handle setting user, session, and navigation.
+      // onAuthStateChange will handle setting user, session, role and navigation.
     } else if (!loginData?.session && !loginData?.user) {
         console.warn('[AuthContext] Login successful but no session/user data returned immediately. Possible MFA or email confirmation pending.');
         toast({
@@ -163,6 +184,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } else {
       setUser(null);
       setSession(null);
+      setUserRole(null);
       setIsAuthenticated(false);
       router.push('/login'); 
       toast({
@@ -173,7 +195,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, user, session, login, logout, isLoading }}>
+    <AuthContext.Provider value={{ isAuthenticated, user, session, userRole, login, logout, isLoading }}>
       {children}
     </AuthContext.Provider>
   );
