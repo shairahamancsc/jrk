@@ -4,7 +4,7 @@
 import type { ReactNode } from 'react';
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase/client';
-import type { LaborProfile, AttendanceEntry, LaborProfileFormDataWithFiles } from '@/types';
+import type { LaborProfile, AttendanceEntry, LaborProfileFormDataWithFiles, Database } from '@/types';
 import { useAuth } from './auth-context'; 
 import { useToast } from "@/hooks/use-toast";
 
@@ -94,7 +94,6 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       console.log('[DataProvider] Initial data load effect starting. User ID:', user?.id);
       setIsLoading(true);
       if (user?.id) {
-        // Fetch sequentially or in parallel
         await fetchLaborProfiles();
         await fetchAttendanceEntries();
       } else {
@@ -106,7 +105,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       console.log('[DataProvider] Initial data load complete. isLoading:', false);
     };
     loadData();
-  }, [user]); 
+  }, [user?.id]); // MODIFIED: Depend on user?.id instead of user object
 
   const uploadFile = async (file: File, profileName: string): Promise<string | undefined> => {
     if (!user?.id) {
@@ -164,7 +163,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       driving_license_url = await uploadFile(profileFormData.drivingLicense, profileFormData.name);
     }
 
-    const profileToInsert = {
+    const profileToInsert: Omit<Database['public']['Tables']['labor_profiles']['Insert'], 'id' | 'created_at'> = {
       user_id: user.id,
       name: profileFormData.name,
       contact: profileFormData.contact,
@@ -203,11 +202,11 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
     const labor = laborProfiles.find(lp => lp.id === entryData.labor_id);
 
-    const entryToInsert = {
+    const entryToInsert: Omit<Database['public']['Tables']['attendance_entries']['Insert'], 'id' | 'created_at'> = {
       user_id: user.id,
       labor_id: entryData.labor_id,
-      labor_name: labor?.name || entryData.labor_name || 'Unknown Labor',
-      date: new Date(entryData.date).toISOString().split('T')[0],
+      labor_name: labor?.name || entryData.labor_name || 'Unknown Labor', // Use existing labor_name if provided
+      date: new Date(entryData.date).toISOString().split('T')[0], // Ensure date is in YYYY-MM-DD format
       status: entryData.status,
       work_details: entryData.work_details,
       advance_amount: entryData.advance_amount,
@@ -246,5 +245,3 @@ export const useData = () => {
   }
   return context;
 };
-
-    
