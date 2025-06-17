@@ -18,6 +18,16 @@ const DataContext = createContext<DataContextType | undefined>(undefined);
 const LABOR_PROFILES_STORAGE_KEY = 'jrke_labor_profiles';
 const ATTENDANCE_ENTRIES_STORAGE_KEY = 'jrke_attendance_entries';
 
+// Helper to safely get ISO string from a Date object
+const getSafeISOString = (dateInput: any, fieldNameForLogging: string): string => {
+  if (dateInput instanceof Date && !isNaN(dateInput.getTime())) {
+    return dateInput.toISOString();
+  }
+  console.warn(`[DataProvider] Invalid or missing date for "${fieldNameForLogging}" during save. Defaulting to current date.`);
+  return new Date().toISOString();
+};
+
+
 export const DataProvider = ({ children }: { children: ReactNode }) => {
   const [laborProfiles, setLaborProfiles] = useState<LaborProfile[]>([]);
   const [attendanceEntries, setAttendanceEntries] = useState<AttendanceEntry[]>([]);
@@ -45,7 +55,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
             aadhaar: typeof p.aadhaar === 'string' ? p.aadhaar : undefined,
             pan: typeof p.pan === 'string' ? p.pan : undefined,
             drivingLicense: typeof p.drivingLicense === 'string' ? p.drivingLicense : undefined,
-            createdAt: p.createdAt ? new Date(p.createdAt) : new Date(),
+            createdAt: p.createdAt ? new Date(p.createdAt) : new Date(), // Ensure createdAt is always a Date
           }));
         } else {
           console.warn(`[DataProvider] Stored labor profiles (key: ${LABOR_PROFILES_STORAGE_KEY}) was not an array, clearing.`);
@@ -74,8 +84,8 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
             status: e.status as AttendanceStatus || 'absent',
             workDetails: typeof e.workDetails === 'string' ? e.workDetails : '',
             advanceAmount: typeof e.advanceAmount === 'number' ? e.advanceAmount : undefined,
-            date: e.date ? new Date(e.date) : new Date(),
-            createdAt: e.createdAt ? new Date(e.createdAt) : new Date(),
+            date: e.date ? new Date(e.date) : new Date(), // Ensure date is always a Date
+            createdAt: e.createdAt ? new Date(e.createdAt) : new Date(), // Ensure createdAt is always a Date
           }));
         } else {
           console.warn(`[DataProvider] Stored attendance entries (key: ${ATTENDANCE_ENTRIES_STORAGE_KEY}) was not an array, clearing.`);
@@ -101,14 +111,14 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       console.log('[DataProvider] Skipping labor profiles save: initial load not complete.');
       return;
     }
-    console.log('[DataProvider] Saving labor profiles to localStorage. Current profiles:', laborProfiles);
+    console.log('[DataProvider] Saving labor profiles to localStorage. Current profiles count:', laborProfiles.length);
     const profilesToSave = laborProfiles.map(profile => ({
       ...profile,
       photo: profile.photo instanceof File ? profile.photo.name : (typeof profile.photo === 'string' ? profile.photo : undefined),
       aadhaar: profile.aadhaar instanceof File ? profile.aadhaar.name : (typeof profile.aadhaar === 'string' ? profile.aadhaar : undefined),
       pan: profile.pan instanceof File ? profile.pan.name : (typeof profile.pan === 'string' ? profile.pan : undefined),
       drivingLicense: profile.drivingLicense instanceof File ? profile.drivingLicense.name : (typeof profile.drivingLicense === 'string' ? profile.drivingLicense : undefined),
-      createdAt: profile.createdAt.toISOString(),
+      createdAt: getSafeISOString(profile.createdAt, `profile ${profile.id} createdAt`),
     }));
     try {
       console.log('[DataProvider] Stringified labor profiles to save:', JSON.stringify(profilesToSave));
@@ -126,11 +136,11 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       console.log('[DataProvider] Skipping attendance entries save: initial load not complete.');
       return;
     }
-    console.log('[DataProvider] Saving attendance entries to localStorage. Current entries:', attendanceEntries);
+    console.log('[DataProvider] Saving attendance entries to localStorage. Current entries count:', attendanceEntries.length);
     const entriesToSave = attendanceEntries.map(entry => ({
       ...entry,
-      date: entry.date.toISOString(),
-      createdAt: entry.createdAt.toISOString(),
+      date: getSafeISOString(entry.date, `entry ${entry.id} date`),
+      createdAt: getSafeISOString(entry.createdAt, `entry ${entry.id} createdAt`),
     }));
     try {
       console.log('[DataProvider] Stringified attendance entries to save:', JSON.stringify(entriesToSave));
@@ -146,7 +156,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     const newProfile: LaborProfile = {
       ...profileData,
       id: Date.now().toString() + Math.random().toString(36).substring(2, 9),
-      createdAt: new Date(),
+      createdAt: new Date(), // Always a valid new Date
     };
     console.log('[DataProvider] Adding new labor profile:', newProfile);
     setLaborProfiles((prev) => [...prev, newProfile]);
@@ -156,13 +166,13 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     const labor = laborProfiles.find(lp => lp.id === entryData.laborId);
     const newEntry: AttendanceEntry = {
       laborId: entryData.laborId,
-      date: entryData.date,
+      date: entryData.date instanceof Date && !isNaN(entryData.date.getTime()) ? entryData.date : new Date(), // Ensure valid date from input
       status: entryData.status,
       workDetails: entryData.workDetails || "",
       advanceAmount: entryData.advanceAmount,
       id: Date.now().toString() + Math.random().toString(36).substring(2, 9),
       laborName: labor?.name || 'Unknown Labor',
-      createdAt: new Date(),
+      createdAt: new Date(), // Always a valid new Date
     };
     console.log('[DataProvider] Adding new attendance entry:', newEntry);
     setAttendanceEntries((prev) => [...prev, newEntry]);
