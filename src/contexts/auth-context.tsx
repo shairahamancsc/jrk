@@ -31,53 +31,60 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const { toast } = useToast();
 
   useEffect(() => {
+    // Set loading true at the start of the effect when the listener is being set up.
+    // This isLoading state is primarily for the initial auth status determination.
     setIsLoading(true);
-    // Get the subscription object correctly
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event: AuthChangeEvent, session: Session | null) => {
-        console.log('[AuthContext] Auth state change event:', event, session);
-        setSession(session);
-        setUser(session?.user ?? null);
-        setIsAuthenticated(!!session?.user);
-        
-        // This logic should only run if isLoading is true to avoid loops on every auth change
-        // after initial load.
-        if (isLoading) { 
-            setIsLoading(false); // Set loading to false once the first auth event is processed
-            if (session?.user) {
-                if (pathname === '/login' || pathname === '/') {
-                    router.replace('/dashboard');
-                }
-            } else {
-                if (pathname !== '/login' && pathname !== '/all-labor') {
-                    router.replace('/login');
-                }
+      async (event: AuthChangeEvent, newSession: Session | null) => {
+        console.log('[AuthContext] Auth state change event:', event, newSession);
+        setSession(newSession);
+        const currentUser = newSession?.user ?? null;
+        setUser(currentUser);
+        setIsAuthenticated(!!currentUser);
+
+        // This logic determines if we are still in the initial loading phase.
+        // If isLoading is true, it means this is the first auth event (or result of getSession)
+        // that definitively sets the auth state.
+        if (isLoading) {
+          setIsLoading(false); // Initial auth state determined, set loading to false.
+          if (currentUser) {
+            if (pathname === '/login' || pathname === '/') {
+              router.replace('/dashboard');
             }
-        } else if (event === 'SIGNED_IN' && (pathname === '/login' || pathname === '/')) {
-          // If already loaded and a new sign-in happens, redirect from login/root
-          router.replace('/dashboard');
-        } else if (event === 'SIGNED_OUT' && pathname !== '/login' && pathname !== '/all-labor') {
-          // If signed out and not on an allowed unauthenticated page, redirect to login
-          router.replace('/login');
+          } else {
+            if (pathname !== '/login' && pathname !== '/all-labor') {
+              router.replace('/login');
+            }
+          }
+        } else {
+          // If not initial loading, handle subsequent auth changes (e.g., explicit sign-in/out)
+          if (event === 'SIGNED_IN' && (pathname === '/login' || pathname === '/')) {
+            router.replace('/dashboard');
+          } else if (event === 'SIGNED_OUT' && pathname !== '/login' && pathname !== '/all-labor') {
+            router.replace('/login');
+          }
         }
       }
     );
 
-    // Check initial session state only once on mount if subscription hasn't fired yet
-    // and isLoading is still true.
+    // Check initial session state more robustly if onAuthStateChange hasn't fired quickly
     const checkInitialSession = async () => {
-      if (isLoading) { // Only check if we haven't received an auth event yet
+      // Only proceed if isLoading is still true, meaning onAuthStateChange hasn't resolved auth state yet.
+      if (isLoading) {
         const { data: { session: initialSession } } = await supabase.auth.getSession();
-        console.log('[AuthContext] Initial session check (if no event yet):', initialSession);
+        console.log('[AuthContext] Initial session check:', initialSession);
         
-        // If onAuthStateChange hasn't set isLoading to false yet, handle initial state.
-        if (isLoading) { 
+        // If isLoading is still true after getSession (i.e., onAuthStateChange hasn't updated it yet)
+        // then this is the point where we establish the initial auth state.
+        if (isLoading) {
           setSession(initialSession);
-          setUser(initialSession?.user ?? null);
-          setIsAuthenticated(!!initialSession?.user);
-          setIsLoading(false); 
+          const initialUser = initialSession?.user ?? null;
+          setUser(initialUser);
+          setIsAuthenticated(!!initialUser);
+          setIsLoading(false); // Initial auth state determined
 
-          if (initialSession?.user) {
+          if (initialUser) {
             if (pathname === '/login' || pathname === '/') {
               router.replace('/dashboard');
             }
@@ -93,18 +100,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     checkInitialSession();
 
     return () => {
-      // Call unsubscribe on the subscription object
+      // Cleanup: unsubscribe from the auth state listener
       subscription?.unsubscribe();
     };
-  }, [pathname, router, isLoading]); // isLoading included to manage its state properly
-
+  }, [pathname, router]); // Dependencies: re-run if pathname or router instance changes.
 
   const login = async (credentials: LoginFormData) => {
-    setIsLoading(true);
+    setIsLoading(true); // Indicate loading during login process
     const { error, data: loginData } = await supabase.auth.signInWithPassword({
       email: credentials.email,
       password: credentials.password,
     });
+    setIsLoading(false); // Reset loading state after login attempt
 
     if (error) {
       console.error('[AuthContext] Login error:', error);
@@ -113,31 +120,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         title: "Login Failed",
         description: error.message || "Invalid email or password.",
       });
-      setIsLoading(false);
       throw error;
     } else if (loginData.user) {
-      // onAuthStateChange will handle setting user, session.
-      // setIsLoading(false) will also be handled by onAuthStateChange.
+      // onAuthStateChange will handle setting user, session, and navigation.
       toast({
         title: "Login Successful",
         description: "Redirecting to dashboard...",
       });
-      // Explicit navigation can be handled by onAuthStateChange or here if preferred.
-      // router.replace('/dashboard'); 
     } else {
-      // Should not happen if no error, but good to handle
       toast({
         variant: "destructive",
         title: "Login Issue",
         description: "An unexpected issue occurred during login.",
       });
-      setIsLoading(false);
     }
   };
 
   const logout = async () => {
-    setIsLoading(true);
+    setIsLoading(true); // Indicate loading during logout process
     const { error } = await supabase.auth.signOut();
+    // setIsLoading(false) will be effectively handled by onAuthStateChange setting the new state,
+    // or we can set it here if preferred for immediate UI feedback before listener fires.
+    // For simplicity, onAuthStateChange will manage isLoading to false after SIGNED_OUT.
+
     if (error) {
       console.error('[AuthContext] Logout error:', error);
       toast({
@@ -145,10 +150,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         title: "Logout Failed",
         description: error.message || "Could not log out.",
       });
-      setIsLoading(false);
+       setIsLoading(false); // Ensure loading is false on error too
     } else {
       // onAuthStateChange will clear user/session.
-      // Explicitly set local state immediately for faster UI update.
+      // Setting local state immediately can make UI feel faster.
       setUser(null);
       setSession(null);
       setIsAuthenticated(false);
@@ -157,7 +162,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         title: "Logged Out",
         description: "You have been successfully logged out.",
       });
-       // setIsLoading(false) will be handled by onAuthStateChange.
+      // isLoading will be set to false by onAuthStateChange
     }
   };
 
