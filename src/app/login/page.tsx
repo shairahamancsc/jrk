@@ -14,31 +14,45 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Eye, EyeOff, Building2, Loader2 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 
+// TODO: If using hCaptcha, uncomment and install:
+// import HCaptcha from '@hcaptcha/react-hcaptcha';
+
 export default function LoginPage() {
   const { login, isLoading: authLoading } = useAuth();
-  const { toast } = useToast(); // from useToast hook, not context
+  const { toast } = useToast(); 
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
+  // TODO: Add state for CAPTCHA token
+  // const [captchaToken, setCaptchaToken] = useState<string | null>(null);
 
   const form = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
       email: '',
       password: '',
+      captchaToken: undefined, // Initialize captchaToken
     },
   });
 
   const onSubmit = async (data: LoginFormData) => {
     setIsSubmitting(true);
+    // TODO: Before calling login, ensure data.captchaToken is set if you're using CAPTCHA
+    // if (!data.captchaToken) { // Or use the state `captchaToken`
+    //   toast({
+    //     variant: "destructive",
+    //     title: "CAPTCHA Required",
+    //     description: "Please complete the CAPTCHA.",
+    //   });
+    //   setIsSubmitting(false);
+    //   return;
+    // }
+
     try {
-      await login(data);
-      // Successful login toast and redirect are handled by AuthContext
+      await login(data); // Data now includes captchaToken (which will be undefined until widget is integrated)
     } catch (error: any) {
-      // Error toast is handled by AuthContext, but we can clear form errors if needed
-      // Or add specific form field errors based on Supabase error type if desired
       form.setError("email", { type: "manual", message: " " }); 
-      form.setError("password", { type: "manual", message: error.message || "Invalid credentials." });
+      form.setError("password", { type: "manual", message: error.message || "Invalid credentials or CAPTCHA issue." });
+      // TODO: Reset CAPTCHA if available, e.g., captchaRef.current?.resetCaptcha();
     } finally {
       setIsSubmitting(false);
     }
@@ -101,6 +115,48 @@ export default function LoginPage() {
                   </FormItem>
                 )}
               />
+
+              {/* 
+                TODO: Add your CAPTCHA component here. Example for hCaptcha:
+                1. Install `@hcaptcha/react-hcaptcha`
+                2. Import it: `import HCaptcha from '@hcaptcha/react-hcaptcha';`
+                3. Get your hCaptcha site key from hcaptcha.com
+                4. Add a ref: `const captchaRef = React.useRef<HCaptcha>(null);`
+                5. Render the component:
+                   <HCaptcha
+                     sitekey="YOUR_HCAPTCHA_SITE_KEY"
+                     onVerify={(token) => {
+                       form.setValue('captchaToken', token); // Set token in form data
+                       // OR setCaptchaToken(token); // If using separate state
+                     }}
+                     onExpire={() => {
+                       form.setValue('captchaToken', undefined);
+                       // OR setCaptchaToken(null);
+                     }}
+                     ref={captchaRef}
+                   />
+                Make sure to handle the case where form.setValue('captchaToken', ...) might trigger a re-render
+                and clear other fields if not handled carefully with react-hook-form.
+                You might need to manage the captchaToken in a separate React state and add it to `data` before calling `login(data)`.
+              */}
+              <FormField
+                control={form.control}
+                name="captchaToken"
+                render={({ field }) => (
+                  <FormItem className="hidden"> {/* Hidden for now, will be populated by actual CAPTCHA widget */}
+                    <FormControl>
+                      <Input type="hidden" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+               <div className="text-xs text-muted-foreground p-2 border rounded-md">
+                Note: CAPTCHA is enabled. Integration of a CAPTCHA widget (e.g., hCaptcha or Cloudflare Turnstile) 
+                is required here to provide a token for successful login.
+              </div>
+
+
               <Button 
                 type="submit" 
                 className="w-full bg-primary hover:bg-primary/90 text-lg py-3 font-semibold"

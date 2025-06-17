@@ -25,20 +25,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isLoading, setIsLoading] = useState(true); //isLoading is for initial auth state determination
+  const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
-  // usePathname hook to get current pathname within the AuthProvider scope if needed by callbacks
-  // but be careful with how it's used if the main effect has an empty dependency array.
-  // For simple redirection based on auth state, router is usually enough.
+  const pathname = usePathname();
+  const { toast } = useToast();
 
   useEffect(() => {
-    // This effect runs once on mount to set up the auth listener and check initial session.
-    setIsLoading(true); 
+    setIsLoading(true);
+    console.log('[AuthContext] Setting up auth listener and initial check.');
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event: AuthChangeEvent, newSession: Session | null) => {
-        const currentPathname = window.location.pathname; // Get current pathname directly
-        console.log('[AuthContext] Auth state change event:', event, 'on path:', currentPathname, 'New session:', newSession);
+        const currentPath = window.location.pathname; // Get current pathname directly
+        console.log('[AuthContext] Auth state change event:', event, 'on path:', currentPath, 'New session:', newSession);
         
         setSession(newSession);
         const currentUser = newSession?.user ?? null;
@@ -46,27 +45,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setIsAuthenticated(!!currentUser);
 
         // This 'isLoading' check ensures this block only runs for the initial auth state determination.
-        // Subsequent calls to onAuthStateChange will fall into the 'else' block.
         if (isLoading) {
-          setIsLoading(false); // Auth state determined, set loading to false.
+          setIsLoading(false); 
+          console.log('[AuthContext] Initial auth state determined. isLoading: false');
           if (currentUser) {
-            if (currentPathname === '/login' || currentPathname === '/') {
+            if (currentPath === '/login' || currentPath === '/') {
+              console.log('[AuthContext] User authenticated on login/root, redirecting to /dashboard');
               router.replace('/dashboard');
             }
           } else {
-            if (currentPathname !== '/login' && currentPathname !== '/all-labor') {
+            if (currentPath !== '/login' && currentPath !== '/all-labor') {
+              console.log('[AuthContext] User not authenticated, not on login or /all-labor, redirecting to /login');
               router.replace('/login');
             }
           }
         } else {
           // Handle subsequent auth changes (e.g., user logs out from another tab, token refresh, etc.)
-          // This logic might need refinement based on desired behavior for background changes.
           if (event === 'SIGNED_IN') {
-            if (currentPathname === '/login' || currentPathname === '/') {
+            if (currentPath === '/login' || currentPath === '/') {
                router.replace('/dashboard');
             }
           } else if (event === 'SIGNED_OUT') {
-            if (currentPathname !== '/login' && currentPathname !== '/all-labor') {
+            if (currentPath !== '/login' && currentPath !== '/all-labor') {
               router.replace('/login');
             }
           }
@@ -76,27 +76,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     // Check initial session state more robustly.
     const checkInitialSession = async () => {
-      // Only proceed if isLoading is still true (i.e., onAuthStateChange hasn't resolved it yet).
       if (isLoading) { 
-        const { data: { session: initialSession } } = await supabase.auth.getSession();
-        const currentPathname = window.location.pathname;
-        console.log('[AuthContext] Initial session check:', initialSession, 'on path:', currentPathname);
+        console.log('[AuthContext] Performing initial session check.');
+        const { data: { session: initialSession }, error: sessionError } = await supabase.auth.getSession();
+        const currentPath = window.location.pathname;
+
+        if (sessionError) {
+            console.error('[AuthContext] Error fetching initial session:', sessionError);
+        }
+        console.log('[AuthContext] Initial session check result:', initialSession, 'on path:', currentPath);
         
-        // If isLoading is still true after getSession (onAuthStateChange might have fired in parallel)
-        // then this is the point where we establish the initial auth state if not already done.
-        if (isLoading) {
+        if (isLoading) { // Check isLoading again as onAuthStateChange might have resolved it
           setSession(initialSession);
           const initialUser = initialSession?.user ?? null;
           setUser(initialUser);
           setIsAuthenticated(!!initialUser);
-          setIsLoading(false); // Initial auth state determined
+          setIsLoading(false); 
+          console.log('[AuthContext] Initial session check complete. isLoading: false');
 
           if (initialUser) {
-            if (currentPathname === '/login' || currentPathname === '/') {
+            if (currentPath === '/login' || currentPath === '/') {
+              console.log('[AuthContext] User authenticated via initial check on login/root, redirecting to /dashboard');
               router.replace('/dashboard');
             }
           } else {
-            if (currentPathname !== '/login' && currentPathname !== '/all-labor') {
+            if (currentPath !== '/login' && currentPath !== '/all-labor') {
+              console.log('[AuthContext] User not authenticated via initial check, not on login or /all-labor, redirecting to /login');
               router.replace('/login');
             }
           }
@@ -107,47 +112,45 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     checkInitialSession();
 
     return () => {
-      // Cleanup: unsubscribe from the auth state listener
+      console.log('[AuthContext] Unsubscribing from auth listener.');
       subscription?.unsubscribe();
     };
-  }, []); // Empty dependency array: run this effect only once on mount.
+  }, []); // Empty dependency array ensures this runs only once on mount.
 
   const login = async (credentials: LoginFormData) => {
-    // setIsLoading(true); // REMOVED: AuthContext.isLoading is for initial load. Login page handles its own button state.
     const { error, data: loginData } = await supabase.auth.signInWithPassword({
       email: credentials.email,
       password: credentials.password,
+      options: {
+        captchaToken: credentials.captchaToken, // Pass CAPTCHA token to Supabase
+      }
     });
-    // setIsLoading(false); // REMOVED
 
     if (error) {
       console.error('[AuthContext] Login error:', error);
       toast({
         variant: "destructive",
         title: "Login Failed",
-        description: error.message || "Invalid email or password.",
+        description: error.message || "Invalid credentials or CAPTCHA issue.",
       });
-      throw error; // Re-throw for the form to handle if needed
+      throw error; 
     } else if (loginData?.user) {
-      // onAuthStateChange will handle setting user, session, and navigation.
-      // A success toast here can be good feedback before onAuthStateChange triggers redirect.
       toast({
         title: "Login Attempt Successful",
         description: "Checking session and redirecting...",
       });
+      // onAuthStateChange will handle setting user, session, and navigation.
     } else if (!loginData?.session && !loginData?.user) {
-        // This case might indicate issues like email not confirmed if that setting is on.
         console.warn('[AuthContext] Login successful but no session/user data returned immediately. Possible MFA or email confirmation pending.');
         toast({
-            variant: "default", // Not necessarily destructive
+            variant: "default",
             title: "Login Acknowledged",
-            description: "Further steps might be required (e.g., email confirmation)."
+            description: "Further steps might be required (e.g., email confirmation or CAPTCHA)."
         });
     }
   };
 
   const logout = async () => {
-    // setIsLoading(true); // REMOVED
     const { error } = await supabase.auth.signOut();
     
     if (error) {
@@ -157,14 +160,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         title: "Logout Failed",
         description: error.message || "Could not log out.",
       });
-      // setIsLoading(false); // REMOVED (only if error previously set it true)
     } else {
-      // onAuthStateChange will clear user/session and trigger navigation.
-      // To make UI feel faster for logout:
       setUser(null);
       setSession(null);
       setIsAuthenticated(false);
-      router.push('/login'); // Explicitly navigate on logout
+      router.push('/login'); 
       toast({
         title: "Logged Out",
         description: "You have been successfully logged out.",
@@ -186,5 +186,3 @@ export const useAuth = () => {
   }
   return context;
 };
-
-    
