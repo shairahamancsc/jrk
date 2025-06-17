@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useEffect, useState } from 'react'; // Added React and useEffect
+import React, { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { laborProfileSchema, type LaborProfileFormData } from '@/schemas/labor-schema';
@@ -10,15 +10,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { UserPlus, FileText, Loader2, Fingerprint, ScanLine } from 'lucide-react';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { UserPlus, FileText, Loader2, Fingerprint, ScanLine, UserCircle2, FilePlus2 } from 'lucide-react';
 import type { LaborProfile, LaborProfileFormDataWithFiles } from '@/types'; 
-// import { useToast } from "@/hooks/use-toast"; // Toast is handled by DataContext
 
 interface LaborProfileFormProps {
   existingProfile?: LaborProfile;
   mode?: 'add' | 'edit';
   onCancel?: () => void;
-  onSubmitSuccess?: () => void; // Callback for successful submission
+  onSubmitSuccess?: () => void; 
 }
 
 export function LaborProfileForm({ 
@@ -28,8 +28,8 @@ export function LaborProfileForm({
   onSubmitSuccess 
 }: LaborProfileFormProps) {
   const { addLaborProfile, updateLaborProfile } = useData();
-  // const { toast } = useToast(); // Local toast might not be needed if DataContext handles it
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
 
   const form = useForm<LaborProfileFormData>({
     resolver: zodResolver(laborProfileSchema),
@@ -38,7 +38,7 @@ export function LaborProfileForm({
       contact: existingProfile?.contact || '',
       aadhaarNumber: existingProfile?.aadhaar_number || '',
       panNumber: existingProfile?.pan_number || '',
-      photo: undefined, // File inputs are always undefined initially unless handled differently for edit
+      photo: undefined,
       aadhaar: undefined,
       pan: undefined,
       drivingLicense: undefined,
@@ -52,16 +52,14 @@ export function LaborProfileForm({
         contact: existingProfile.contact,
         aadhaarNumber: existingProfile.aadhaar_number || '',
         panNumber: existingProfile.pan_number || '',
-        // Note: File inputs cannot be programmatically pre-filled with existing files for security reasons.
-        // Users must re-select files if they wish to change them.
-        // URLs like existingProfile.photo_url can be displayed separately as "current photo".
         photo: undefined,
         aadhaar: undefined,
         pan: undefined,
         drivingLicense: undefined,
       });
+      setPhotoPreviewUrl(existingProfile.photo_url || null);
     } else if (mode === 'add') {
-       form.reset({ // Reset to initial empty values for 'add' mode
+       form.reset({ 
         name: '',
         contact: '',
         aadhaarNumber: '',
@@ -71,6 +69,7 @@ export function LaborProfileForm({
         pan: undefined,
         drivingLicense: undefined,
       });
+      setPhotoPreviewUrl(null);
     }
   }, [existingProfile, mode, form]);
 
@@ -95,19 +94,19 @@ export function LaborProfileForm({
         await addLaborProfile(profileDataForContext); 
       }
       
-      if (mode === 'add') { // Only reset form for add mode
+      if (mode === 'add') { 
         form.reset();
+        setPhotoPreviewUrl(null); 
       }
-      onSubmitSuccess?.(); // Call success callback e.g. to close modal
+      onSubmitSuccess?.(); 
     } catch (error) {
       console.error("Submission error in form:", error);
-      // Error toast should be handled by context methods (addLaborProfile/updateLaborProfile)
     } finally {
       setIsSubmitting(false);
     }
   };
   
-  const FileInput = ({ field, label, currentFileUrl }: { field: any; label: string, currentFileUrl?: string }) => (
+  const GenericFileInput = ({ fieldName, label, currentFileUrl }: { fieldName: keyof LaborProfileFormData; label: string, currentFileUrl?: string }) => (
     <FormItem>
       <FormLabel className="flex items-center gap-2 text-foreground">
         <FileText size={16} /> {label}
@@ -115,7 +114,7 @@ export function LaborProfileForm({
       {mode === 'edit' && currentFileUrl && (
         <div className="text-xs text-muted-foreground mb-1">
           Current: <a href={currentFileUrl} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">{currentFileUrl.substring(currentFileUrl.lastIndexOf('/') + 1)}</a>
-          <p className="text-xs">(To change, select a new file below. To remove, ensure no new file is selected and this will be handled by update logic - TBD).</p>
+          <p className="text-xs">(To change, select a new file below.)</p>
         </div>
       )}
       <FormControl>
@@ -123,7 +122,7 @@ export function LaborProfileForm({
           type="file" 
           accept="image/*,application/pdf"
           className="file:text-primary file:font-semibold file:mr-2 file:border-0 file:bg-accent file:text-accent-foreground file:rounded-md file:px-2 file:py-1 hover:file:bg-accent/80"
-          {...form.register(field.name)} 
+          {...form.register(fieldName)} 
           disabled={isSubmitting}
         />
       </FormControl>
@@ -131,7 +130,6 @@ export function LaborProfileForm({
     </FormItem>
   );
 
-  // Determine card title based on mode
   const cardTitle = mode === 'edit' ? "Edit Labor Profile" : "Add New Labor Profile";
   const cardDescription = mode === 'edit' 
     ? `Update details for ${existingProfile?.name || 'the labor'}.`
@@ -139,7 +137,6 @@ export function LaborProfileForm({
   const submitButtonText = mode === 'edit' ? "Save Changes" : "Add Labor Profile";
   const submittingButtonText = mode === 'edit' ? "Saving..." : "Adding...";
 
-  // If form is part of a modal (edit mode) and onCancel is provided, don't render a Card wrapper
   const FormWrapper = ({ children }: { children: React.ReactNode }) => 
     mode === 'edit' ? <>{children}</> : (
       <Card className="shadow-lg w-full">
@@ -158,6 +155,55 @@ export function LaborProfileForm({
     <FormWrapper>
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          
+          <FormField
+            control={form.control}
+            name="photo"
+            render={({ field }) => (
+              <FormItem className="flex flex-col items-center space-y-3">
+                <Avatar className="h-32 w-32 border-2 border-muted-foreground/50">
+                  <AvatarImage src={photoPreviewUrl || existingProfile?.photo_url || ''} alt="Profile Photo Preview" data-ai-hint="profile person" />
+                  <AvatarFallback>
+                    <UserCircle2 className="h-20 w-20 text-muted-foreground" />
+                  </AvatarFallback>
+                </Avatar>
+                <FormControl>
+                  <>
+                    <Input
+                      id="photo-upload"
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        form.setValue('photo', e.target.files, { shouldValidate: true }); // Pass FileList
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onloadend = () => {
+                            setPhotoPreviewUrl(reader.result as string);
+                          };
+                          reader.readAsDataURL(file);
+                        } else {
+                          setPhotoPreviewUrl(existingProfile?.photo_url || null); // Revert to existing or null
+                        }
+                      }}
+                      ref={field.ref} // react-hook-form needs the ref
+                      disabled={isSubmitting}
+                    />
+                    <FormLabel
+                      htmlFor="photo-upload"
+                      className="cursor-pointer inline-flex items-center gap-2 text-sm font-medium text-primary hover:text-primary/80"
+                    >
+                      <FilePlus2 size={18} />
+                      Upload Photo
+                    </FormLabel>
+                  </>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <FormField
               control={form.control}
@@ -226,26 +272,9 @@ export function LaborProfileForm({
           <h3 className="text-lg font-semibold text-primary pt-4 border-t mt-6">Upload Documents (Optional)</h3>
           <p className="text-sm text-muted-foreground -mt-4 mb-4">These are for document copies (images/PDFs). The numbers are entered above.</p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <FormField
-              control={form.control}
-              name="photo"
-              render={({ field }) => <FileInput field={field} label="Profile Photo" currentFileUrl={existingProfile?.photo_url}/>}
-            />
-            <FormField
-              control={form.control}
-              name="aadhaar" 
-              render={({ field }) => <FileInput field={field} label="Aadhaar Card Document" currentFileUrl={existingProfile?.aadhaar_url} />}
-            />
-            <FormField
-              control={form.control}
-              name="pan"
-              render={({ field }) => <FileInput field={field} label="PAN Card Document" currentFileUrl={existingProfile?.pan_url}/>}
-            />
-            <FormField
-              control={form.control}
-              name="drivingLicense"
-              render={({ field }) => <FileInput field={field} label="Driving License Document" currentFileUrl={existingProfile?.driving_license_url} />}
-            />
+            <GenericFileInput fieldName="aadhaar" label="Aadhaar Card Document" currentFileUrl={existingProfile?.aadhaar_url} />
+            <GenericFileInput fieldName="pan" label="PAN Card Document" currentFileUrl={existingProfile?.pan_url}/>
+            <GenericFileInput fieldName="drivingLicense" label="Driving License Document" currentFileUrl={existingProfile?.driving_license_url} />
           </div>
           
           <div className="flex gap-2">
@@ -261,7 +290,10 @@ export function LaborProfileForm({
               <Button 
                 type="button" 
                 variant="outline"
-                onClick={onCancel}
+                onClick={() => {
+                  setPhotoPreviewUrl(existingProfile?.photo_url || null); // Reset preview on cancel
+                  onCancel();
+                }}
                 className="text-base py-3 px-6"
                 disabled={isSubmitting}
               >
@@ -274,3 +306,5 @@ export function LaborProfileForm({
     </FormWrapper>
   );
 }
+
+    
