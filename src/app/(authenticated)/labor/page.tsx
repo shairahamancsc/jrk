@@ -7,13 +7,50 @@ import { useData } from '@/contexts/data-context';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { FileText, UserCircle2, Users, Loader2, Fingerprint, ScanLine } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { FileText, UserCircle2, Users, Loader2, Fingerprint, ScanLine, MoreHorizontal, Eye, Edit3, Trash2 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
-import Image from 'next/image';
+import type { LaborProfile } from '@/types';
+import { useToast } from "@/hooks/use-toast";
 
 export default function LaborPage() {
-  const { laborProfiles, isLoading: dataLoading } = useData();
+  const { laborProfiles, isLoading: dataLoading, deleteLaborProfile } = useData();
+  const { toast } = useToast();
   const [clientLoading, setClientLoading] = useState(true);
+
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
+
+  const [selectedProfile, setSelectedProfile] = useState<LaborProfile | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
 
   useEffect(() => {
     if (!dataLoading) {
@@ -48,6 +85,37 @@ export default function LaborPage() {
     }
     return ''; 
   }
+
+  const handleOpenViewModal = (profile: LaborProfile) => {
+    setSelectedProfile(profile);
+    setIsViewModalOpen(true);
+  };
+
+  const handleOpenEditModal = (profile: LaborProfile) => {
+    setSelectedProfile(profile);
+    setIsEditModalOpen(true);
+  };
+
+  const handleOpenDeleteAlert = (profile: LaborProfile) => {
+    setSelectedProfile(profile);
+    setIsDeleteAlertOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!selectedProfile) return;
+    setIsDeleting(true);
+    try {
+      await deleteLaborProfile(selectedProfile.id);
+      // Toast for success is handled in deleteLaborProfile
+      setIsDeleteAlertOpen(false);
+      setSelectedProfile(null);
+    } catch (error: any) {
+       // Toast for error is handled in deleteLaborProfile
+      console.error("Error during profile deletion in page:", error);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
   
   if (clientLoading || dataLoading) { 
     return (
@@ -87,6 +155,7 @@ export default function LaborPage() {
                     <TableHead>PAN Doc</TableHead>
                     <TableHead>License Doc</TableHead>
                     <TableHead>Added On</TableHead>
+                    <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -112,6 +181,32 @@ export default function LaborPage() {
                       <TableCell>{getFileDisplay(profile.pan_url)}</TableCell>
                       <TableCell>{getFileDisplay(profile.driving_license_url)}</TableCell>
                       <TableCell>{profile.created_at ? format(parseISO(profile.created_at), "PP") : 'N/A'}</TableCell>
+                      <TableCell>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" className="h-8 w-8 p-0">
+                              <span className="sr-only">Open menu</span>
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                            <DropdownMenuItem onClick={() => handleOpenViewModal(profile)}>
+                              <Eye className="mr-2 h-4 w-4" /> View
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleOpenEditModal(profile)}>
+                              <Edit3 className="mr-2 h-4 w-4" /> Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={() => handleOpenDeleteAlert(profile)}
+                              className="text-destructive focus:text-destructive focus:bg-destructive/10"
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" /> Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -122,6 +217,85 @@ export default function LaborPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* View Profile Modal Placeholder */}
+      {selectedProfile && (
+        <Dialog open={isViewModalOpen} onOpenChange={setIsViewModalOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>View Profile: {selectedProfile.name}</DialogTitle>
+              <DialogDescription>
+                Detailed information for {selectedProfile.name}.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <p><strong>Name:</strong> {selectedProfile.name}</p>
+              <p><strong>Contact:</strong> {selectedProfile.contact}</p>
+              <p><strong>Aadhaar Number:</strong> {selectedProfile.aadhaar_number || 'N/A'}</p>
+              <p><strong>PAN Number:</strong> {selectedProfile.pan_number || 'N/A'}</p>
+              <p><strong>Photo:</strong></p>
+              {selectedProfile.photo_url && <img src={getAvatarSrc(selectedProfile.photo_url)} alt="Profile" className="rounded-md max-h-48" />}
+              <p><strong>Aadhaar Document:</strong> {getFileDisplay(selectedProfile.aadhaar_url)}</p>
+              <p><strong>PAN Document:</strong> {getFileDisplay(selectedProfile.pan_url)}</p>
+              <p><strong>License Document:</strong> {getFileDisplay(selectedProfile.driving_license_url)}</p>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsViewModalOpen(false)}>Close</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Edit Profile Modal Placeholder */}
+      {selectedProfile && (
+        <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Edit Profile: {selectedProfile.name}</DialogTitle>
+               <DialogDescription>
+                Modify the details for {selectedProfile.name}.
+              </DialogDescription>
+            </DialogHeader>
+            {/* The LaborProfileForm would be rendered here, pre-filled */}
+            <div className="py-4">
+              <LaborProfileForm 
+                existingProfile={selectedProfile} 
+                mode="edit" 
+                onCancel={() => setIsEditModalOpen(false)}
+                // onSuccess is implicitly handled by data context refetching, 
+                // but you might want a specific callback here to close the modal
+                // e.g., onSubmitSuccess={() => setIsEditModalOpen(false)}
+              />
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      {selectedProfile && (
+        <AlertDialog open={isDeleteAlertOpen} onOpenChange={setIsDeleteAlertOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This action cannot be undone. This will permanently delete the profile
+                for <strong>{selectedProfile.name}</strong> and all associated documents.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isDeleting} onClick={() => setSelectedProfile(null)}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleConfirmDelete}
+                disabled={isDeleting}
+                className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+              >
+                {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {isDeleting ? 'Deleting...' : 'Yes, delete profile'}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
     </div>
   );
 }

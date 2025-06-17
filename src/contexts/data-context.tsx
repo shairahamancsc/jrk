@@ -13,12 +13,34 @@ interface DataContextType {
   attendanceEntries: AttendanceEntry[];
   addLaborProfile: (profileData: LaborProfileFormDataWithFiles) => Promise<void>;
   addAttendanceEntry: (entryData: Omit<AttendanceEntry, 'id' | 'created_at' | 'user_id'>) => Promise<void>;
+  deleteLaborProfile: (profileId: string) => Promise<void>;
+  updateLaborProfile: (profileId: string, profileData: Partial<LaborProfileFormDataWithFiles>) => Promise<void>; // Partial for updates
+  fetchLaborProfileById: (profileId: string) => Promise<LaborProfile | null>;
   isLoading: boolean;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
 const STORAGE_BUCKET_NAME = 'profile-documents'; 
+
+// Helper function to extract file path from Supabase Storage URL
+const getPathFromUrl = (url: string): string | null => {
+  try {
+    const urlObject = new URL(url);
+    // Example URL: https://<project_ref>.supabase.co/storage/v1/object/public/<bucket_name>/<path_to_file>
+    // We want to extract <path_to_file>
+    // The path starts after `/storage/v1/object/public/BUCKET_NAME/`
+    const prefix = `/storage/v1/object/public/${STORAGE_BUCKET_NAME}/`;
+    if (urlObject.pathname.startsWith(prefix)) {
+      return urlObject.pathname.substring(prefix.length);
+    }
+    return null;
+  } catch (e) {
+    console.error("Error parsing URL for file path:", e);
+    return null;
+  }
+};
+
 
 export const DataProvider = ({ children }: { children: ReactNode }) => {
   const [laborProfiles, setLaborProfiles] = useState<LaborProfile[]>([]);
@@ -29,11 +51,9 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
   const fetchLaborProfiles = async () => {
     if (!user?.id) {
-      console.log('[DataProvider] No user, skipping fetchLaborProfiles.');
       setLaborProfiles([]);
       return;
     }
-    console.log('[DataProvider] Fetching labor profiles for user:', user.id);
     const { data, error } = await supabase
       .from('labor_profiles')
       .select('*')
@@ -41,30 +61,41 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.error('[DataProvider] Error fetching labor profiles. Supabase error object:', error);
-      try {
-        console.error('[DataProvider] Supabase error stringified:', JSON.stringify(error, null, 2));
-      } catch (e) {
-        console.error('[DataProvider] Could not stringify Supabase error object.');
-      }
-      if (typeof error === 'object' && error !== null) {
-        console.error('[DataProvider] Supabase error object keys:', Object.keys(error));
-      }
-      toast({ variant: "destructive", title: "Fetch Error", description: "Could not fetch labor profiles. Check RLS policies, network, and console for details." });
+      console.error('[DataProvider] Error fetching labor profiles:', error);
+      toast({ variant: "destructive", title: "Fetch Error", description: "Could not fetch labor profiles." });
       setLaborProfiles([]);
     } else {
-      console.log('[DataProvider] Fetched labor profiles successfully. Data:', data);
       setLaborProfiles(data || []);
     }
   };
 
+  const fetchLaborProfileById = async (profileId: string): Promise<LaborProfile | null> => {
+    if (!user?.id) {
+        toast({ variant: "destructive", title: "Auth Error", description: "User not authenticated." });
+        return null;
+    }
+    setIsLoading(true);
+    const { data, error } = await supabase
+        .from('labor_profiles')
+        .select('*')
+        .eq('id', profileId)
+        .eq('user_id', user.id)
+        .single();
+    setIsLoading(false);
+    if (error) {
+        console.error(`[DataProvider] Error fetching labor profile by ID ${profileId}:`, error);
+        toast({ variant: "destructive", title: "Fetch Error", description: `Could not fetch profile: ${error.message}` });
+        return null;
+    }
+    return data;
+  };
+
+
   const fetchAttendanceEntries = async () => {
     if (!user?.id) {
-      console.log('[DataProvider] No user, skipping fetchAttendanceEntries.');
       setAttendanceEntries([]);
       return;
     }
-    console.log('[DataProvider] Fetching attendance entries for user:', user.id);
     const { data, error } = await supabase
       .from('attendance_entries')
       .select('*') 
@@ -72,26 +103,16 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.error('[DataProvider] Error fetching attendance entries. Supabase error object:', error);
-      try {
-        console.error('[DataProvider] Supabase error stringified:', JSON.stringify(error, null, 2));
-      } catch (e) {
-        console.error('[DataProvider] Could not stringify Supabase error object.');
-      }
-      if (typeof error === 'object' && error !== null) {
-        console.error('[DataProvider] Supabase error object keys:', Object.keys(error));
-      }
-      toast({ variant: "destructive", title: "Fetch Error", description: "Could not fetch attendance records. Check RLS policies, network, and console for details." });
+      console.error('[DataProvider] Error fetching attendance entries:', error);
+      toast({ variant: "destructive", title: "Fetch Error", description: "Could not fetch attendance records." });
       setAttendanceEntries([]);
     } else {
-      console.log('[DataProvider] Fetched attendance entries successfully. Data:', data);
       setAttendanceEntries(data || []);
     }
   };
 
   useEffect(() => {
     const loadData = async () => {
-      console.log('[DataProvider] Initial data load effect starting. User ID:', user?.id);
       setIsLoading(true);
       if (user?.id) {
         await fetchLaborProfiles();
@@ -99,10 +120,8 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       } else {
         setLaborProfiles([]);
         setAttendanceEntries([]);
-        console.log('[DataProvider] No user, cleared local data states.');
       }
       setIsLoading(false);
-      console.log('[DataProvider] Initial data load complete. isLoading:', false);
     };
     loadData();
   }, [user?.id]);
@@ -113,14 +132,14 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       return undefined;
     }
     const sanitizedProfileName = profileName.replace(/[^a-zA-Z0-9-_]/g, '_');
-    const fileName = `public/${user.id}/${sanitizedProfileName}_${Date.now()}_${file.name}`;
+    // This fileName is the path within the bucket
+    const filePathInBucket = `public/${user.id}/${sanitizedProfileName}_${Date.now()}_${file.name}`;
     
-    console.log(`[DataProvider] Uploading file: ${fileName} to bucket: ${STORAGE_BUCKET_NAME}`);
     const { data, error } = await supabase.storage
       .from(STORAGE_BUCKET_NAME)
-      .upload(fileName, file, {
+      .upload(filePathInBucket, file, {
         cacheControl: '3600',
-        upsert: false,
+        upsert: false, // Consider true for updates if file names can be the same
       });
 
     if (error) {
@@ -129,9 +148,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       return undefined;
     }
 
-    console.log('[DataProvider] File uploaded successfully to Supabase Storage:', data);
-    const { data: { publicUrl } } = supabase.storage.from(STORAGE_BUCKET_NAME).getPublicUrl(fileName);
-    console.log('[DataProvider] Public URL for uploaded file:', publicUrl);
+    const { data: { publicUrl } } = supabase.storage.from(STORAGE_BUCKET_NAME).getPublicUrl(filePathInBucket);
     return publicUrl;
   };
 
@@ -140,7 +157,6 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       toast({ variant: "destructive", title: "Auth Error", description: "User not authenticated to add profile." });
       return;
     }
-    console.log('[DataProvider] Attempting to add new labor profile:', profileFormData);
     setIsLoading(true);
 
     let photo_url: string | undefined = undefined;
@@ -149,12 +165,12 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     }
 
     let aadhaar_url: string | undefined = undefined;
-    if (profileFormData.aadhaar instanceof File) { // This is for the document
+    if (profileFormData.aadhaar instanceof File) {
       aadhaar_url = await uploadFile(profileFormData.aadhaar, profileFormData.name);
     }
 
     let pan_url: string | undefined = undefined;
-    if (profileFormData.pan instanceof File) { // This is for the document
+    if (profileFormData.pan instanceof File) {
       pan_url = await uploadFile(profileFormData.pan, profileFormData.name);
     }
 
@@ -167,16 +183,14 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       user_id: user.id,
       name: profileFormData.name,
       contact: profileFormData.contact,
-      aadhaar_number: profileFormData.aadhaarNumber, // Text input field
-      pan_number: profileFormData.panNumber,         // Text input field
+      aadhaar_number: profileFormData.aadhaarNumber,
+      pan_number: profileFormData.panNumber,
       photo_url,
-      aadhaar_url, // Document URL
-      pan_url,     // Document URL
+      aadhaar_url,
+      pan_url,
       driving_license_url,
     };
     
-    console.log('[DataProvider] Profile data to insert into Supabase table:', profileToInsert);
-
     const { data, error } = await supabase
       .from('labor_profiles')
       .insert(profileToInsert)
@@ -184,22 +198,112 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       .single();
 
     if (error) {
-      console.error('[DataProvider] Error adding labor profile to Supabase table:', error);
+      console.error('[DataProvider] Error adding labor profile:', error);
       toast({ variant: "destructive", title: "Database Error", description: `Could not add labor profile: ${error.message}` });
     } else if (data) {
-      console.log('[DataProvider] Labor profile added successfully to Supabase table:', data);
       await fetchLaborProfiles(); 
       toast({ title: "Success", description: "Labor profile added." });
     }
     setIsLoading(false);
   };
 
+  const deleteLaborProfile = async (profileId: string) => {
+    if (!user?.id) {
+        toast({ variant: "destructive", title: "Auth Error", description: "User not authenticated." });
+        throw new Error("User not authenticated");
+    }
+
+    const profileToDelete = laborProfiles.find(p => p.id === profileId);
+    if (!profileToDelete) {
+        toast({ variant: "destructive", title: "Error", description: "Profile not found." });
+        throw new Error("Profile not found");
+    }
+
+    setIsLoading(true);
+    try {
+        const filesToDelete: string[] = [];
+        if (profileToDelete.photo_url) {
+            const path = getPathFromUrl(profileToDelete.photo_url);
+            if (path) filesToDelete.push(path);
+        }
+        if (profileToDelete.aadhaar_url) {
+            const path = getPathFromUrl(profileToDelete.aadhaar_url);
+            if (path) filesToDelete.push(path);
+        }
+        if (profileToDelete.pan_url) {
+            const path = getPathFromUrl(profileToDelete.pan_url);
+            if (path) filesToDelete.push(path);
+        }
+        if (profileToDelete.driving_license_url) {
+            const path = getPathFromUrl(profileToDelete.driving_license_url);
+            if (path) filesToDelete.push(path);
+        }
+
+        if (filesToDelete.length > 0) {
+            const { error: storageError } = await supabase.storage
+                .from(STORAGE_BUCKET_NAME)
+                .remove(filesToDelete);
+            if (storageError) {
+                console.error('[DataProvider] Error deleting files from storage:', storageError);
+                toast({ variant: "destructive", title: "Storage Error", description: `Could not delete associated files: ${storageError.message}. Profile not deleted.` });
+                // Decide if you want to proceed with DB deletion if storage fails. Usually not.
+                throw storageError; 
+            }
+        }
+
+        const { error: dbError } = await supabase
+            .from('labor_profiles')
+            .delete()
+            .eq('id', profileId)
+            .eq('user_id', user.id); // Ensure user owns the profile
+
+        if (dbError) {
+            console.error('[DataProvider] Error deleting labor profile from database:', dbError);
+            toast({ variant: "destructive", title: "Database Error", description: `Could not delete profile: ${dbError.message}` });
+            throw dbError;
+        }
+
+        setLaborProfiles(prevProfiles => prevProfiles.filter(p => p.id !== profileId));
+        toast({ title: "Success", description: `Profile for ${profileToDelete.name} deleted.` });
+
+    } catch (error) {
+        console.error('[DataProvider] Overall error in deleteLaborProfile:', error);
+        // Specific toasts are shown above, this is a fallback or re-throw.
+        // No generic toast here as specific ones are more informative.
+        throw error; // Re-throw to be caught by the calling component if needed
+    } finally {
+        setIsLoading(false);
+    }
+  };
+  
+  // Placeholder for updateLaborProfile - to be implemented fully later
+  const updateLaborProfile = async (profileId: string, profileData: Partial<LaborProfileFormDataWithFiles>) => {
+    if (!user?.id) {
+        toast({ variant: "destructive", title: "Auth Error", description: "User not authenticated." });
+        return;
+    }
+    setIsLoading(true);
+    console.log('[DataProvider] Placeholder: updateLaborProfile called for ID:', profileId, 'with data:', profileData);
+    // Full implementation will involve:
+    // 1. Fetching the current profile to compare file URLs.
+    // 2. If new files are provided in profileData (as File objects):
+    //    a. Upload new files (get new URLs).
+    //    b. Delete old files from storage if they are being replaced.
+    // 3. If file fields are explicitly set to null/undefined, delete existing files.
+    // 4. Update the database record with new text data and new file URLs.
+    // 5. Refetch labor profiles.
+    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate async operation
+    toast({ title: "In Progress", description: "Update functionality is under development." });
+    await fetchLaborProfiles(); // Refetch for now
+    setIsLoading(false);
+  };
+
+
   const addAttendanceEntry = async (entryData: Omit<AttendanceEntry, 'id' | 'created_at' | 'user_id'>) => {
      if (!user?.id) {
       toast({ variant: "destructive", title: "Auth Error", description: "User not authenticated to add attendance." });
       return;
     }
-    console.log('[DataProvider] Attempting to add new attendance entry:', entryData);
     setIsLoading(true);
 
     const labor = laborProfiles.find(lp => lp.id === entryData.labor_id);
@@ -214,8 +318,6 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       advance_amount: entryData.advance_amount,
     };
 
-    console.log('[DataProvider] Attendance entry data to insert into Supabase table:', entryToInsert);
-
     const { data, error } = await supabase
       .from('attendance_entries')
       .insert(entryToInsert)
@@ -223,10 +325,9 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       .single();
 
     if (error) {
-      console.error('[DataProvider] Error adding attendance entry to Supabase table:', error);
+      console.error('[DataProvider] Error adding attendance entry:', error);
       toast({ variant: "destructive", title: "Database Error", description: `Could not add attendance entry: ${error.message}` });
     } else if (data) {
-      console.log('[DataProvider] Attendance entry added successfully to Supabase table:', data);
       await fetchAttendanceEntries(); 
       toast({ title: "Success", description: "Attendance entry recorded." });
     }
@@ -234,7 +335,16 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <DataContext.Provider value={{ laborProfiles, attendanceEntries, addLaborProfile, addAttendanceEntry, isLoading }}>
+    <DataContext.Provider value={{ 
+        laborProfiles, 
+        attendanceEntries, 
+        addLaborProfile, 
+        addAttendanceEntry, 
+        deleteLaborProfile,
+        updateLaborProfile, 
+        fetchLaborProfileById,
+        isLoading 
+    }}>
       {children}
     </DataContext.Provider>
   );
