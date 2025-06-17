@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState } from 'react';
@@ -10,37 +11,36 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Eye, EyeOff, Building2 } from 'lucide-react';
+import { Eye, EyeOff, Building2, Loader2 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 
 export default function LoginPage() {
-  const { login } = useAuth();
-  const { toast } = useToast();
+  const { login, isLoading: authLoading } = useAuth();
+  const { toast } = useToast(); // from useToast hook, not context
   const [showPassword, setShowPassword] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
 
   const form = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      userId: '',
+      email: '',
       password: '',
     },
   });
 
-  const onSubmit = (data: LoginFormData) => {
-    if (data.userId === 'Illu' && data.password === '12345678') {
-      login(data.userId);
-      toast({
-        title: "Login Successful",
-        description: "Welcome back, Admin!",
-      });
-    } else {
-      toast({
-        variant: "destructive",
-        title: "Login Failed",
-        description: "Invalid User ID or Password.",
-      });
-      form.setError("userId", { type: "manual", message: " " }); // Add error to trigger field highlight
-      form.setError("password", { type: "manual", message: "Invalid credentials" });
+  const onSubmit = async (data: LoginFormData) => {
+    setIsSubmitting(true);
+    try {
+      await login(data);
+      // Successful login toast and redirect are handled by AuthContext
+    } catch (error: any) {
+      // Error toast is handled by AuthContext, but we can clear form errors if needed
+      // Or add specific form field errors based on Supabase error type if desired
+      form.setError("email", { type: "manual", message: " " }); 
+      form.setError("password", { type: "manual", message: error.message || "Invalid credentials." });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -59,12 +59,12 @@ export default function LoginPage() {
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
               <FormField
                 control={form.control}
-                name="userId"
+                name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-foreground">User ID</FormLabel>
+                    <FormLabel className="text-foreground">Email</FormLabel>
                     <FormControl>
-                      <Input placeholder="Enter User ID (Illu)" {...field} className="text-base" />
+                      <Input placeholder="Enter your email" {...field} className="text-base" type="email" autoComplete="email" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -80,9 +80,10 @@ export default function LoginPage() {
                       <div className="relative">
                         <Input 
                           type={showPassword ? "text" : "password"} 
-                          placeholder="Enter Password (12345678)" 
+                          placeholder="Enter your password" 
                           {...field}
                           className="text-base pr-10"
+                          autoComplete="current-password"
                         />
                         <Button 
                           type="button" 
@@ -100,8 +101,13 @@ export default function LoginPage() {
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-lg py-3 font-semibold">
-                Login
+              <Button 
+                type="submit" 
+                className="w-full bg-primary hover:bg-primary/90 text-lg py-3 font-semibold"
+                disabled={isSubmitting || authLoading}
+              >
+                {(isSubmitting || authLoading) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {isSubmitting ? "Logging in..." : (authLoading ? "Authenticating..." : "Login")}
               </Button>
             </form>
           </Form>
