@@ -21,9 +21,8 @@ import {
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
+  DialogTitle, // Keep DialogTitle
+  DialogDescription, // Keep DialogDescription
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
@@ -34,10 +33,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { FileText, UserCircle2, Users, Loader2, Fingerprint, ScanLine, MoreHorizontal, Eye, Edit3, Trash2 } from 'lucide-react';
+import { FileText, UserCircle2, Users, Loader2, MoreHorizontal, Eye, Edit3, Trash2 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import type { LaborProfile } from '@/types';
 import { useToast } from "@/hooks/use-toast";
+import { cn } from '@/lib/utils';
 
 export default function LaborPage() {
   const { laborProfiles, isLoading: dataLoading, deleteLaborProfile } = useData();
@@ -218,23 +218,23 @@ export default function LaborPage() {
         </CardContent>
       </Card>
 
-      {/* View Profile Modal Placeholder */}
+      {/* View Profile Modal */}
       {selectedProfile && (
         <Dialog open={isViewModalOpen} onOpenChange={setIsViewModalOpen}>
           <DialogContent className="sm:max-w-md">
-            <DialogHeader>
+            <div className={cn("flex flex-col space-y-1.5 text-center sm:text-left")}>
               <DialogTitle>View Profile: {selectedProfile.name}</DialogTitle>
               <DialogDescription>
                 Detailed information for {selectedProfile.name}.
               </DialogDescription>
-            </DialogHeader>
+            </div>
             <div className="space-y-4 py-4">
               <p><strong>Name:</strong> {selectedProfile.name}</p>
               <p><strong>Contact:</strong> {selectedProfile.contact}</p>
               <p><strong>Aadhaar Number:</strong> {selectedProfile.aadhaar_number || 'N/A'}</p>
               <p><strong>PAN Number:</strong> {selectedProfile.pan_number || 'N/A'}</p>
               <p><strong>Photo:</strong></p>
-              {selectedProfile.photo_url && <img src={getAvatarSrc(selectedProfile.photo_url)} alt="Profile" className="rounded-md max-h-48" />}
+              {selectedProfile.photo_url && <img src={getAvatarSrc(selectedProfile.photo_url)} alt="Profile" className="rounded-md max-h-48" data-ai-hint="profile person"/>}
               <p><strong>Aadhaar Document:</strong> {getFileDisplay(selectedProfile.aadhaar_url)}</p>
               <p><strong>PAN Document:</strong> {getFileDisplay(selectedProfile.pan_url)}</p>
               <p><strong>License Document:</strong> {getFileDisplay(selectedProfile.driving_license_url)}</p>
@@ -246,25 +246,22 @@ export default function LaborPage() {
         </Dialog>
       )}
 
-      {/* Edit Profile Modal Placeholder */}
+      {/* Edit Profile Modal */}
       {selectedProfile && (
         <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
           <DialogContent className="sm:max-w-lg">
-            <DialogHeader>
+            <div className={cn("flex flex-col space-y-1.5 text-center sm:text-left")}>
               <DialogTitle>Edit Profile: {selectedProfile.name}</DialogTitle>
                <DialogDescription>
                 Modify the details for {selectedProfile.name}.
               </DialogDescription>
-            </DialogHeader>
-            {/* The LaborProfileForm would be rendered here, pre-filled */}
+            </div>
             <div className="py-4">
               <LaborProfileForm 
                 existingProfile={selectedProfile} 
                 mode="edit" 
                 onCancel={() => setIsEditModalOpen(false)}
-                // onSuccess is implicitly handled by data context refetching, 
-                // but you might want a specific callback here to close the modal
-                // e.g., onSubmitSuccess={() => setIsEditModalOpen(false)}
+                onSubmitSuccess={() => setIsEditModalOpen(false)}
               />
             </div>
           </DialogContent>
@@ -299,3 +296,5 @@ export default function LaborPage() {
     </div>
   );
 }
+
+    
