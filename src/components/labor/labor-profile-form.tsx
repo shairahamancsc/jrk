@@ -277,10 +277,10 @@ export function LaborProfileForm({
             <GenericFileInput fieldName="drivingLicense" label="Driving License Document" currentFileUrl={existingProfile?.driving_license_url} />
           </div>
           
-          <div className="flex gap-2">
+          <div className="flex flex-col md:flex-row gap-2 pt-4">
             <Button 
               type="submit" 
-              className="bg-primary hover:bg-primary/90 text-base py-3 px-6 flex-grow md:flex-grow-0"
+              className="bg-primary hover:bg-primary/90 text-base py-3 px-6 w-full md:w-auto"
               disabled={isSubmitting}
             >
               {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -291,10 +291,10 @@ export function LaborProfileForm({
                 type="button" 
                 variant="outline"
                 onClick={() => {
-                  setPhotoPreviewUrl(existingProfile?.photo_url || null); // Reset preview on cancel
+                  setPhotoPreviewUrl(existingProfile?.photo_url || null); 
                   onCancel();
                 }}
-                className="text-base py-3 px-6"
+                className="text-base py-3 px-6 w-full md:w-auto"
                 disabled={isSubmitting}
               >
                 Cancel
@@ -306,5 +306,3 @@ export function LaborProfileForm({
     </FormWrapper>
   );
 }
-
-    

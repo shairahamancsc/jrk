@@ -70,18 +70,18 @@ export default function DashboardPage() {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-center gap-4">
         <h1 className="text-3xl font-headline font-bold text-primary">Daily Attendance Dashboard</h1>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col sm:flex-row items-center gap-2 w-full md:w-auto">
           <Input 
             placeholder="Search by name or work details..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="max-w-xs"
+            className="w-full sm:max-w-xs"
           />
           <Popover>
             <PopoverTrigger asChild>
               <Button
                 variant={"outline"}
-                className="w-[280px] justify-start text-left font-normal"
+                className="w-full sm:w-[280px] justify-start text-left font-normal"
               >
                 <CalendarDays className="mr-2 h-4 w-4" />
                 {selectedDate ? format(selectedDate, "PPP") : <span>Pick a date</span>}

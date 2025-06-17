@@ -59,7 +59,7 @@ export default function AllLaborPage() {
   return (
     <div className="container mx-auto space-y-8 p-4 md:p-8">
       <div className="text-center">
-        <h1 className="text-4xl font-headline font-bold text-primary mb-2">Labor Profiles</h1>
+        <h1 className="text-3xl md:text-4xl font-headline font-bold text-primary mb-2">Labor Profiles</h1>
         <p className="text-lg text-muted-foreground">
           Browse all registered labor profiles.
         </p>
@@ -95,7 +95,7 @@ export default function AllLaborPage() {
                   {laborProfiles.map((profile) => (
                     <TableRow key={profile.id} className="hover:bg-muted/50 transition-colors">
                       <TableCell>
-                        <Avatar className="h-12 w-12">
+                        <Avatar className="h-10 w-10 sm:h-12 sm:w-12">
                           <AvatarImage 
                             src={getAvatarSrc(profile.photo_url)}
                             alt={profile.name}
@@ -106,14 +106,14 @@ export default function AllLaborPage() {
                           </AvatarFallback>
                         </Avatar>
                       </TableCell>
-                      <TableCell className="font-medium text-base">{profile.name}</TableCell>
-                      <TableCell className="text-sm">{profile.contact}</TableCell>
-                      <TableCell className="text-sm">{profile.aadhaar_number || <span className="text-muted-foreground text-xs">N/A</span>}</TableCell>
-                      <TableCell className="text-sm">{profile.pan_number || <span className="text-muted-foreground text-xs">N/A</span>}</TableCell>
+                      <TableCell className="font-medium text-sm sm:text-base">{profile.name}</TableCell>
+                      <TableCell className="text-xs sm:text-sm">{profile.contact}</TableCell>
+                      <TableCell className="text-xs sm:text-sm">{profile.aadhaar_number || <span className="text-muted-foreground text-xs">N/A</span>}</TableCell>
+                      <TableCell className="text-xs sm:text-sm">{profile.pan_number || <span className="text-muted-foreground text-xs">N/A</span>}</TableCell>
                       <TableCell>{getFileDisplay(profile.aadhaar_url)}</TableCell>
                       <TableCell>{getFileDisplay(profile.pan_url)}</TableCell>
                       <TableCell>{getFileDisplay(profile.driving_license_url)}</TableCell>
-                      <TableCell className="text-sm">{profile.created_at ? format(parseISO(profile.created_at), "PP") : 'N/A'}</TableCell>
+                      <TableCell className="text-xs sm:text-sm">{profile.created_at ? format(parseISO(profile.created_at), "PP") : 'N/A'}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
