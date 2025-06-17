@@ -11,7 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Eye, EyeOff, UserPlus, Loader2 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
-// import { supabase } from '@/lib/supabase/client'; // For actual implementation with Edge Function
+import { supabase } from '@/lib/supabase/client'; // Ensure Supabase client is imported
 
 export default function AddSupervisorPage() {
   const { toast } = useToast();
@@ -26,46 +26,41 @@ export default function AddSupervisorPage() {
     },
   });
 
-  const handleCreateSupervisor = async (data: SupervisorCreationFormData) => {
+  const handleCreateSupervisor = async (formData: SupervisorCreationFormData) => {
     setIsSubmitting(true);
-    console.log("Attempting to create supervisor:", data.email);
+    console.log("Attempting to create supervisor via Edge Function:", formData.email);
 
-    // -------------------------------------------------------------------------
-    // TODO: SECURE SUPERVISOR CREATION LOGIC
-    // The following is a placeholder. In a real application, you MUST NOT
-    // call Supabase admin functions directly from the client-side.
-    //
-    // 1. Create a Supabase Edge Function (e.g., 'create-supervisor').
-    // 2. This Edge Function should:
-    //    - Be callable only by authenticated admin users (check requestor's role).
-    //    - Use the `supabase.auth.admin.createUser()` method with the service_role key.
-    //    - Include `user_metadata: { role: 'supervisor' }` in the createUser options.
-    //    - Optionally, send a password reset or invitation email.
-    // 3. From here, invoke that Edge Function:
-    //    const { data: funcData, error: funcError } = await supabase.functions.invoke('create-supervisor', {
-    //      body: { email: data.email, password: data.password }, // Or just email if sending invite
-    //    });
-    //    if (funcError) { /* handle error */ } else { /* handle success */ }
-    // -------------------------------------------------------------------------
+    try {
+      const { data: funcData, error: funcError } = await supabase.functions.invoke('create-supervisor', {
+        body: { email: formData.email, password: formData.password },
+      });
 
-    // Simulating an API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
-
-    // Placeholder success handling
-    toast({
-      title: "Supervisor Account Submitted (Simulated)",
-      description: `Request to create supervisor with email ${data.email} has been processed. (This is a simulation - backend integration needed.)`,
-    });
-    form.reset();
-    
-    // Placeholder error handling (example)
-    // toast({
-    //   variant: "destructive",
-    //   title: "Failed to Create Supervisor (Simulated)",
-    //   description: "Could not create supervisor account. Check backend function.",
-    // });
-
-    setIsSubmitting(false);
+      if (funcError) {
+        console.error('Error creating supervisor via Edge Function:', funcError);
+        toast({
+          variant: "destructive",
+          title: "Failed to Create Supervisor",
+          description: funcError.message || "Could not create supervisor account. Check Edge Function logs.",
+        });
+      } else {
+        console.log('Supervisor creation initiated successfully:', funcData);
+        toast({
+          title: "Supervisor Account Created",
+          description: `Supervisor account for ${formData.email} has been successfully created.`,
+        });
+        form.reset();
+      }
+    } catch (e: any) {
+      // Catch any unexpected errors during the invoke call itself
+      console.error('Unexpected error invoking Edge Function:', e);
+      toast({
+        variant: "destructive",
+        title: "Invocation Error",
+        description: e.message || "An unexpected error occurred while trying to create the supervisor.",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -83,8 +78,8 @@ export default function AddSupervisorPage() {
         <CardHeader>
           <CardTitle>Supervisor Account Details</CardTitle>
           <CardDescription>
-            The new supervisor will be able to log in with these credentials.
-            An email will NOT be sent automatically by this form (backend required).
+            The new supervisor will be created with the role 'supervisor'.
+            They will be able to log in with these credentials.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -141,12 +136,11 @@ export default function AddSupervisorPage() {
                 disabled={isSubmitting}
               >
                 {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {isSubmitting ? "Submitting..." : "Create Supervisor Account"}
+                {isSubmitting ? "Creating Account..." : "Create Supervisor Account"}
               </Button>
                <div className="text-xs text-muted-foreground p-2 border rounded-md bg-background">
-                <strong>Important:</strong> This form simulates supervisor creation.
-                Actual user creation and role assignment require secure backend integration (e.g., a Supabase Edge Function).
-                The password entered here should be temporary; the supervisor should change it upon first login.
+                <strong>Note:</strong> This form invokes a secure Supabase Edge Function to create the supervisor account.
+                The password entered here should be temporary; the supervisor should be advised to change it upon first login if your Edge Function doesn't automatically send an invitation/reset link.
               </div>
             </form>
           </Form>
