@@ -18,7 +18,7 @@ interface DataContextType {
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
-const STORAGE_BUCKET_NAME = 'profile_documents'; // Confirmed by user
+const STORAGE_BUCKET_NAME = 'profile-documents'; // Corrected bucket name
 
 export const DataProvider = ({ children }: { children: ReactNode }) => {
   const [laborProfiles, setLaborProfiles] = useState<LaborProfile[]>([]);
