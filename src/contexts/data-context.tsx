@@ -5,7 +5,7 @@ import type { ReactNode } from 'react';
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase/client';
 import type { LaborProfile, AttendanceEntry, LaborProfileFormDataWithFiles } from '@/types';
-import { useAuth } from './auth-context'; // To get user_id for RLS
+import { useAuth } from './auth-context'; 
 import { useToast } from "@/hooks/use-toast";
 
 interface DataContextType {
@@ -18,7 +18,7 @@ interface DataContextType {
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
-const STORAGE_BUCKET_NAME = 'profile-documents'; // Corrected bucket name
+const STORAGE_BUCKET_NAME = 'profile-documents'; 
 
 export const DataProvider = ({ children }: { children: ReactNode }) => {
   const [laborProfiles, setLaborProfiles] = useState<LaborProfile[]>([]);
@@ -41,11 +41,19 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.error('[DataProvider] Error fetching labor profiles:', error);
-      toast({ variant: "destructive", title: "Error", description: "Could not fetch labor profiles." });
+      console.error('[DataProvider] Error fetching labor profiles. Supabase error object:', error);
+      try {
+        console.error('[DataProvider] Supabase error stringified:', JSON.stringify(error, null, 2));
+      } catch (e) {
+        console.error('[DataProvider] Could not stringify Supabase error object.');
+      }
+      if (typeof error === 'object' && error !== null) {
+        console.error('[DataProvider] Supabase error object keys:', Object.keys(error));
+      }
+      toast({ variant: "destructive", title: "Fetch Error", description: "Could not fetch labor profiles. Check RLS policies, network, and console for details." });
       setLaborProfiles([]);
     } else {
-      console.log('[DataProvider] Fetched labor profiles:', data);
+      console.log('[DataProvider] Fetched labor profiles successfully. Data:', data);
       setLaborProfiles(data || []);
     }
   };
@@ -59,29 +67,37 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     console.log('[DataProvider] Fetching attendance entries for user:', user.id);
     const { data, error } = await supabase
       .from('attendance_entries')
-      .select('*') // Select all fields, including labor_name if it's on the table
+      .select('*') 
       .eq('user_id', user.id)
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.error('[DataProvider] Error fetching attendance entries:', error);
-      toast({ variant: "destructive", title: "Error", description: "Could not fetch attendance entries." });
+      console.error('[DataProvider] Error fetching attendance entries. Supabase error object:', error);
+      try {
+        console.error('[DataProvider] Supabase error stringified:', JSON.stringify(error, null, 2));
+      } catch (e) {
+        console.error('[DataProvider] Could not stringify Supabase error object.');
+      }
+      if (typeof error === 'object' && error !== null) {
+        console.error('[DataProvider] Supabase error object keys:', Object.keys(error));
+      }
+      toast({ variant: "destructive", title: "Fetch Error", description: "Could not fetch attendance records. Check RLS policies, network, and console for details." });
       setAttendanceEntries([]);
     } else {
-      console.log('[DataProvider] Fetched attendance entries:', data);
+      console.log('[DataProvider] Fetched attendance entries successfully. Data:', data);
       setAttendanceEntries(data || []);
     }
   };
 
   useEffect(() => {
     const loadData = async () => {
-      console.log('[DataProvider] Initial data load effect starting. User:', user);
+      console.log('[DataProvider] Initial data load effect starting. User ID:', user?.id);
       setIsLoading(true);
       if (user?.id) {
+        // Fetch sequentially or in parallel
         await fetchLaborProfiles();
         await fetchAttendanceEntries();
       } else {
-        // Clear data if no user is logged in (e.g., after logout)
         setLaborProfiles([]);
         setAttendanceEntries([]);
         console.log('[DataProvider] No user, cleared local data states.');
@@ -90,7 +106,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       console.log('[DataProvider] Initial data load complete. isLoading:', false);
     };
     loadData();
-  }, [user]); // Re-run when user object changes (login/logout)
+  }, [user]); 
 
   const uploadFile = async (file: File, profileName: string): Promise<string | undefined> => {
     if (!user?.id) {
@@ -98,7 +114,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       return undefined;
     }
     const sanitizedProfileName = profileName.replace(/[^a-zA-Z0-9-_]/g, '_');
-    const fileName = `public/${user.id}/${sanitizedProfileName}_${Date.now()}_${file.name}`; // Ensure 'public/' prefix if bucket is public
+    const fileName = `public/${user.id}/${sanitizedProfileName}_${Date.now()}_${file.name}`;
     
     console.log(`[DataProvider] Uploading file: ${fileName} to bucket: ${STORAGE_BUCKET_NAME}`);
     const { data, error } = await supabase.storage
@@ -114,19 +130,18 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       return undefined;
     }
 
-    console.log('[DataProvider] File uploaded successfully:', data);
-    // Get public URL. Ensure path matches exactly what was uploaded.
+    console.log('[DataProvider] File uploaded successfully to Supabase Storage:', data);
     const { data: { publicUrl } } = supabase.storage.from(STORAGE_BUCKET_NAME).getPublicUrl(fileName);
-    console.log('[DataProvider] Public URL:', publicUrl);
+    console.log('[DataProvider] Public URL for uploaded file:', publicUrl);
     return publicUrl;
   };
 
   const addLaborProfile = async (profileFormData: LaborProfileFormDataWithFiles) => {
     if (!user?.id) {
-      toast({ variant: "destructive", title: "Auth Error", description: "User not authenticated." });
+      toast({ variant: "destructive", title: "Auth Error", description: "User not authenticated to add profile." });
       return;
     }
-    console.log('[DataProvider] Adding new labor profile:', profileFormData);
+    console.log('[DataProvider] Attempting to add new labor profile:', profileFormData);
     setIsLoading(true);
 
     let photo_url: string | undefined = undefined;
@@ -157,10 +172,9 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       aadhaar_url,
       pan_url,
       driving_license_url,
-      // created_at will be set by Supabase default
     };
     
-    console.log('[DataProvider] Profile to insert into Supabase:', profileToInsert);
+    console.log('[DataProvider] Profile data to insert into Supabase table:', profileToInsert);
 
     const { data, error } = await supabase
       .from('labor_profiles')
@@ -169,11 +183,11 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       .single();
 
     if (error) {
-      console.error('[DataProvider] Error adding labor profile:', error);
-      toast({ variant: "destructive", title: "Error", description: `Could not add labor profile: ${error.message}` });
+      console.error('[DataProvider] Error adding labor profile to Supabase table:', error);
+      toast({ variant: "destructive", title: "Database Error", description: `Could not add labor profile: ${error.message}` });
     } else if (data) {
-      console.log('[DataProvider] Labor profile added successfully to Supabase:', data);
-      await fetchLaborProfiles(); // Re-fetch to ensure consistency and get new 'created_at'
+      console.log('[DataProvider] Labor profile added successfully to Supabase table:', data);
+      await fetchLaborProfiles(); 
       toast({ title: "Success", description: "Labor profile added." });
     }
     setIsLoading(false);
@@ -181,10 +195,10 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
   const addAttendanceEntry = async (entryData: Omit<AttendanceEntry, 'id' | 'created_at' | 'user_id'>) => {
      if (!user?.id) {
-      toast({ variant: "destructive", title: "Auth Error", description: "User not authenticated." });
+      toast({ variant: "destructive", title: "Auth Error", description: "User not authenticated to add attendance." });
       return;
     }
-    console.log('[DataProvider] Adding new attendance entry:', entryData);
+    console.log('[DataProvider] Attempting to add new attendance entry:', entryData);
     setIsLoading(true);
 
     const labor = laborProfiles.find(lp => lp.id === entryData.labor_id);
@@ -192,15 +206,14 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     const entryToInsert = {
       user_id: user.id,
       labor_id: entryData.labor_id,
-      labor_name: labor?.name || entryData.labor_name || 'Unknown Labor', // Ensure labor_name is included
+      labor_name: labor?.name || entryData.labor_name || 'Unknown Labor',
       date: new Date(entryData.date).toISOString().split('T')[0],
       status: entryData.status,
       work_details: entryData.work_details,
       advance_amount: entryData.advance_amount,
-      // created_at will be set by Supabase default
     };
 
-    console.log('[DataProvider] Attendance entry to insert into Supabase:', entryToInsert);
+    console.log('[DataProvider] Attendance entry data to insert into Supabase table:', entryToInsert);
 
     const { data, error } = await supabase
       .from('attendance_entries')
@@ -209,11 +222,11 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       .single();
 
     if (error) {
-      console.error('[DataProvider] Error adding attendance entry:', error);
-      toast({ variant: "destructive", title: "Error", description: `Could not add attendance entry: ${error.message}` });
+      console.error('[DataProvider] Error adding attendance entry to Supabase table:', error);
+      toast({ variant: "destructive", title: "Database Error", description: `Could not add attendance entry: ${error.message}` });
     } else if (data) {
-      console.log('[DataProvider] Attendance entry added successfully to Supabase:', data);
-      await fetchAttendanceEntries(); // Re-fetch
+      console.log('[DataProvider] Attendance entry added successfully to Supabase table:', data);
+      await fetchAttendanceEntries(); 
       toast({ title: "Success", description: "Attendance entry recorded." });
     }
     setIsLoading(false);
