@@ -23,10 +23,9 @@ const getSafeISOString = (dateInput: any, fieldNameForLogging: string): string =
   if (dateInput instanceof Date && !isNaN(dateInput.getTime())) {
     return dateInput.toISOString();
   }
-  console.warn(`[DataProvider] Invalid or missing date for "${fieldNameForLogging}" during save. Defaulting to current date.`);
+  console.warn(`[DataProvider] Invalid or missing date for "${fieldNameForLogging}" during save. Defaulting to current date's ISO string.`);
   return new Date().toISOString();
 };
-
 
 export const DataProvider = ({ children }: { children: ReactNode }) => {
   const [laborProfiles, setLaborProfiles] = useState<LaborProfile[]>([]);
@@ -55,7 +54,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
             aadhaar: typeof p.aadhaar === 'string' ? p.aadhaar : undefined,
             pan: typeof p.pan === 'string' ? p.pan : undefined,
             drivingLicense: typeof p.drivingLicense === 'string' ? p.drivingLicense : undefined,
-            createdAt: p.createdAt ? new Date(p.createdAt) : new Date(), // Ensure createdAt is always a Date
+            createdAt: p.createdAt ? new Date(p.createdAt) : new Date(),
           }));
         } else {
           console.warn(`[DataProvider] Stored labor profiles (key: ${LABOR_PROFILES_STORAGE_KEY}) was not an array, clearing.`);
@@ -84,8 +83,8 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
             status: e.status as AttendanceStatus || 'absent',
             workDetails: typeof e.workDetails === 'string' ? e.workDetails : '',
             advanceAmount: typeof e.advanceAmount === 'number' ? e.advanceAmount : undefined,
-            date: e.date ? new Date(e.date) : new Date(), // Ensure date is always a Date
-            createdAt: e.createdAt ? new Date(e.createdAt) : new Date(), // Ensure createdAt is always a Date
+            date: e.date ? new Date(e.date) : new Date(),
+            createdAt: e.createdAt ? new Date(e.createdAt) : new Date(),
           }));
         } else {
           console.warn(`[DataProvider] Stored attendance entries (key: ${ATTENDANCE_ENTRIES_STORAGE_KEY}) was not an array, clearing.`);
@@ -111,7 +110,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       console.log('[DataProvider] Skipping labor profiles save: initial load not complete.');
       return;
     }
-    console.log('[DataProvider] Saving labor profiles to localStorage. Current profiles count:', laborProfiles.length);
+    console.log('[DataProvider] Saving labor profiles to localStorage. Current profiles:', laborProfiles);
     const profilesToSave = laborProfiles.map(profile => ({
       ...profile,
       photo: profile.photo instanceof File ? profile.photo.name : (typeof profile.photo === 'string' ? profile.photo : undefined),
@@ -136,7 +135,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       console.log('[DataProvider] Skipping attendance entries save: initial load not complete.');
       return;
     }
-    console.log('[DataProvider] Saving attendance entries to localStorage. Current entries count:', attendanceEntries.length);
+    console.log('[DataProvider] Saving attendance entries to localStorage. Current entries:', attendanceEntries);
     const entriesToSave = attendanceEntries.map(entry => ({
       ...entry,
       date: getSafeISOString(entry.date, `entry ${entry.id} date`),
@@ -156,7 +155,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     const newProfile: LaborProfile = {
       ...profileData,
       id: Date.now().toString() + Math.random().toString(36).substring(2, 9),
-      createdAt: new Date(), // Always a valid new Date
+      createdAt: new Date(),
     };
     console.log('[DataProvider] Adding new labor profile:', newProfile);
     setLaborProfiles((prev) => [...prev, newProfile]);
@@ -166,13 +165,13 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     const labor = laborProfiles.find(lp => lp.id === entryData.laborId);
     const newEntry: AttendanceEntry = {
       laborId: entryData.laborId,
-      date: entryData.date instanceof Date && !isNaN(entryData.date.getTime()) ? entryData.date : new Date(), // Ensure valid date from input
+      date: entryData.date, // Assuming date is already a valid Date object from the form
       status: entryData.status,
       workDetails: entryData.workDetails || "",
       advanceAmount: entryData.advanceAmount,
       id: Date.now().toString() + Math.random().toString(36).substring(2, 9),
       laborName: labor?.name || 'Unknown Labor',
-      createdAt: new Date(), // Always a valid new Date
+      createdAt: new Date(),
     };
     console.log('[DataProvider] Adding new attendance entry:', newEntry);
     setAttendanceEntries((prev) => [...prev, newEntry]);
