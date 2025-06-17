@@ -8,11 +8,11 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import type { AttendanceEntry, AttendanceStatus } from '@/types';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { ListOrdered, Loader2 } from 'lucide-react';
 
 export default function AttendancePage() {
-  const { attendanceEntries, laborProfiles, isLoading: dataLoading } = useData();
+  const { attendanceEntries, laborProfiles, isLoading: dataLoading } = useData(); // laborProfiles is needed by AttendanceForm
   const [clientLoading, setClientLoading] = useState(true);
 
   useEffect(() => {
@@ -23,7 +23,7 @@ export default function AttendancePage() {
 
   const recentEntries = useMemo(() => {
     return [...attendanceEntries]
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .sort((a, b) => parseISO(b.created_at).getTime() - parseISO(a.created_at).getTime())
       .slice(0, 10); 
   }, [attendanceEntries]);
 
@@ -39,8 +39,7 @@ export default function AttendancePage() {
     return workDetails || 'N/A';
   };
 
-
-  if (clientLoading) {
+  if (clientLoading || dataLoading) {
     return (
       <div className="flex h-[calc(100vh-theme(spacing.14)-2*theme(spacing.4))] items-center justify-center">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -52,7 +51,7 @@ export default function AttendancePage() {
     <div className="space-y-8">
       <h1 className="text-3xl font-headline font-bold text-primary">Daily Attendance Entry</h1>
       
-      <AttendanceForm />
+      <AttendanceForm /> {/* LaborProfiles is used within AttendanceForm via useData() */}
 
       <Card className="shadow-lg">
         <CardHeader>
@@ -79,23 +78,23 @@ export default function AttendancePage() {
                 </TableHeader>
                 <TableBody>
                   {recentEntries.map((entry) => {
-                    const labor = laborProfiles.find(lp => lp.id === entry.laborId);
+                    // laborName is now directly on the entry if populated correctly during add/fetch
                     return (
                       <TableRow key={entry.id} className="hover:bg-muted/50 transition-colors">
-                        <TableCell className="font-medium">{labor?.name || entry.laborName || 'N/A'}</TableCell>
-                        <TableCell>{format(new Date(entry.date), "PP")}</TableCell>
+                        <TableCell className="font-medium">{entry.labor_name || 'N/A'}</TableCell>
+                        <TableCell>{format(parseISO(entry.date), "PP")}</TableCell>
                         <TableCell>
                           <Badge className={`${getStatusColor(entry.status)} text-xs text-white`}>
                             {entry.status.charAt(0).toUpperCase() + entry.status.slice(1)}
                           </Badge>
                         </TableCell>
-                        <TableCell className="max-w-xs truncate">{getWorkDetailsDisplay(entry.workDetails)}</TableCell>
+                        <TableCell className="max-w-xs truncate">{getWorkDetailsDisplay(entry.work_details)}</TableCell>
                         <TableCell>
-                          {entry.advanceAmount !== undefined && entry.advanceAmount > 0 
-                            ? `₹${entry.advanceAmount.toFixed(2)}` 
+                          {entry.advance_amount !== undefined && entry.advance_amount !== null && entry.advance_amount > 0 
+                            ? `₹${entry.advance_amount.toFixed(2)}` 
                             : 'N/A'}
                         </TableCell>
-                        <TableCell>{format(new Date(entry.createdAt), "Pp")}</TableCell>
+                        <TableCell>{format(parseISO(entry.created_at), "Pp")}</TableCell>
                       </TableRow>
                     );
                   })}

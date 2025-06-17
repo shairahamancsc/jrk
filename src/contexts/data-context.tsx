@@ -2,179 +2,214 @@
 "use client";
 
 import type { ReactNode } from 'react';
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
-import type { LaborProfile, AttendanceEntry, AttendanceStatus } from '@/types';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabase/client';
+import type { LaborProfile, AttendanceEntry, AttendanceStatus, LaborProfileFormDataWithFiles } from '@/types';
+import { useAuth } from './auth-context'; // To get user_id for RLS
+import { useToast } from "@/hooks/use-toast";
 
 interface DataContextType {
   laborProfiles: LaborProfile[];
   attendanceEntries: AttendanceEntry[];
-  addLaborProfile: (profile: Omit<LaborProfile, 'id' | 'createdAt'>) => void;
-  addAttendanceEntry: (entry: Omit<AttendanceEntry, 'id' | 'createdAt' | 'laborName'>) => void;
+  addLaborProfile: (profileData: LaborProfileFormDataWithFiles) => Promise<void>;
+  addAttendanceEntry: (entryData: Omit<AttendanceEntry, 'id' | 'created_at' | 'user_id'>) => Promise<void>;
   isLoading: boolean;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
-const LABOR_PROFILES_STORAGE_KEY = 'jrke_labor_profiles';
-const ATTENDANCE_ENTRIES_STORAGE_KEY = 'jrke_attendance_entries';
-
-// Helper to safely get ISO string from a Date object
-const getSafeISOString = (dateInput: any, fieldNameForLogging: string): string => {
-  if (dateInput instanceof Date && !isNaN(dateInput.getTime())) {
-    return dateInput.toISOString();
-  }
-  console.warn(`[DataProvider] Invalid or missing date for "${fieldNameForLogging}" during save. Defaulting to current date's ISO string.`);
-  return new Date().toISOString();
-};
+const STORAGE_BUCKET_NAME = 'profile_documents'; // Ensure this bucket exists in your Supabase project
 
 export const DataProvider = ({ children }: { children: ReactNode }) => {
   const [laborProfiles, setLaborProfiles] = useState<LaborProfile[]>([]);
   const [attendanceEntries, setAttendanceEntries] = useState<AttendanceEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const isInitialLoadComplete = useRef(false);
+  const { user } = useAuth();
+  const { toast } = useToast();
 
-  // Effect for initial loading from localStorage
-  useEffect(() => {
-    console.log('[DataProvider] Initial load effect starting...');
-    setIsLoading(true);
+  const fetchLaborProfiles = async () => {
+    if (!user?.id) return; // Don't fetch if no user, RLS might block
+    console.log('[DataProvider] Fetching labor profiles...');
+    const { data, error } = await supabase
+      .from('labor_profiles')
+      .select('*')
+      .eq('user_id', user.id) // Assuming RLS uses user_id
+      .order('created_at', { ascending: false });
 
-    let profilesToSet: LaborProfile[] = [];
-    try {
-      const storedLaborProfiles = localStorage.getItem(LABOR_PROFILES_STORAGE_KEY);
-      console.log('[DataProvider] Raw storedLaborProfiles from localStorage:', storedLaborProfiles);
-      if (storedLaborProfiles) {
-        const parsedProfiles = JSON.parse(storedLaborProfiles);
-        console.log('[DataProvider] Parsed storedLaborProfiles:', parsedProfiles);
-        if (Array.isArray(parsedProfiles)) {
-          profilesToSet = parsedProfiles.map((p: any) => ({
-            id: p.id || '',
-            name: p.name || '',
-            contact: p.contact || '',
-            photo: typeof p.photo === 'string' ? p.photo : undefined,
-            aadhaar: typeof p.aadhaar === 'string' ? p.aadhaar : undefined,
-            pan: typeof p.pan === 'string' ? p.pan : undefined,
-            drivingLicense: typeof p.drivingLicense === 'string' ? p.drivingLicense : undefined,
-            createdAt: p.createdAt ? new Date(p.createdAt) : new Date(),
-          }));
-        } else {
-          console.warn(`[DataProvider] Stored labor profiles (key: ${LABOR_PROFILES_STORAGE_KEY}) was not an array, clearing.`);
-          localStorage.removeItem(LABOR_PROFILES_STORAGE_KEY);
-        }
-      }
-    } catch (error) {
-      console.error(`[DataProvider] Error loading or parsing labor profiles from localStorage (key: ${LABOR_PROFILES_STORAGE_KEY}):`, error);
-      localStorage.removeItem(LABOR_PROFILES_STORAGE_KEY);
+    if (error) {
+      console.error('[DataProvider] Error fetching labor profiles:', error);
+      toast({ variant: "destructive", title: "Error", description: "Could not fetch labor profiles." });
+      setLaborProfiles([]);
+    } else {
+      console.log('[DataProvider] Fetched labor profiles:', data);
+      setLaborProfiles(data || []);
     }
-    setLaborProfiles(profilesToSet);
-    console.log('[DataProvider] Labor profiles state set after load:', profilesToSet);
-
-    let entriesToSet: AttendanceEntry[] = [];
-    try {
-      const storedAttendanceEntries = localStorage.getItem(ATTENDANCE_ENTRIES_STORAGE_KEY);
-      console.log('[DataProvider] Raw storedAttendanceEntries from localStorage:', storedAttendanceEntries);
-      if (storedAttendanceEntries) {
-        const parsedEntries = JSON.parse(storedAttendanceEntries);
-        console.log('[DataProvider] Parsed storedAttendanceEntries:', parsedEntries);
-        if (Array.isArray(parsedEntries)) {
-          entriesToSet = parsedEntries.map((e: any) => ({
-            id: e.id || '',
-            laborId: e.laborId || '',
-            laborName: e.laborName || 'Unknown Labor',
-            status: e.status as AttendanceStatus || 'absent',
-            workDetails: typeof e.workDetails === 'string' ? e.workDetails : '',
-            advanceAmount: typeof e.advanceAmount === 'number' ? e.advanceAmount : undefined,
-            date: e.date ? new Date(e.date) : new Date(),
-            createdAt: e.createdAt ? new Date(e.createdAt) : new Date(),
-          }));
-        } else {
-          console.warn(`[DataProvider] Stored attendance entries (key: ${ATTENDANCE_ENTRIES_STORAGE_KEY}) was not an array, clearing.`);
-          localStorage.removeItem(ATTENDANCE_ENTRIES_STORAGE_KEY);
-        }
-      }
-    } catch (error) {
-      console.error(`[DataProvider] Error loading or parsing attendance entries from localStorage (key: ${ATTENDANCE_ENTRIES_STORAGE_KEY}):`, error);
-      localStorage.removeItem(ATTENDANCE_ENTRIES_STORAGE_KEY);
-    }
-    setAttendanceEntries(entriesToSet);
-    console.log('[DataProvider] Attendance entries state set after load:', entriesToSet);
-
-    setIsLoading(false);
-    isInitialLoadComplete.current = true;
-    console.log('[DataProvider] Initial load complete. isLoading:', false, 'isInitialLoadComplete.current:', isInitialLoadComplete.current);
-  }, []);
-
-  // Effect for saving laborProfiles to localStorage
-  useEffect(() => {
-    console.log('[DataProvider] Labor profiles save effect triggered. isInitialLoadComplete.current:', isInitialLoadComplete.current);
-    if (!isInitialLoadComplete.current) {
-      console.log('[DataProvider] Skipping labor profiles save: initial load not complete.');
-      return;
-    }
-    console.log('[DataProvider] Saving labor profiles to localStorage. Current profiles:', laborProfiles);
-    const profilesToSave = laborProfiles.map(profile => ({
-      ...profile,
-      photo: profile.photo instanceof File ? profile.photo.name : (typeof profile.photo === 'string' ? profile.photo : undefined),
-      aadhaar: profile.aadhaar instanceof File ? profile.aadhaar.name : (typeof profile.aadhaar === 'string' ? profile.aadhaar : undefined),
-      pan: profile.pan instanceof File ? profile.pan.name : (typeof profile.pan === 'string' ? profile.pan : undefined),
-      drivingLicense: profile.drivingLicense instanceof File ? profile.drivingLicense.name : (typeof profile.drivingLicense === 'string' ? profile.drivingLicense : undefined),
-      createdAt: getSafeISOString(profile.createdAt, `profile ${profile.id} createdAt`),
-    }));
-    try {
-      console.log('[DataProvider] Stringified labor profiles to save:', JSON.stringify(profilesToSave));
-      localStorage.setItem(LABOR_PROFILES_STORAGE_KEY, JSON.stringify(profilesToSave));
-      console.log('[DataProvider] Labor profiles successfully saved to localStorage.');
-    } catch (error) {
-      console.error("[DataProvider] Failed to save labor profiles to localStorage:", error);
-    }
-  }, [laborProfiles]);
-
-  // Effect for saving attendanceEntries to localStorage
-  useEffect(() => {
-    console.log('[DataProvider] Attendance entries save effect triggered. isInitialLoadComplete.current:', isInitialLoadComplete.current);
-    if (!isInitialLoadComplete.current) {
-      console.log('[DataProvider] Skipping attendance entries save: initial load not complete.');
-      return;
-    }
-    console.log('[DataProvider] Saving attendance entries to localStorage. Current entries:', attendanceEntries);
-    const entriesToSave = attendanceEntries.map(entry => ({
-      ...entry,
-      date: getSafeISOString(entry.date, `entry ${entry.id} date`),
-      createdAt: getSafeISOString(entry.createdAt, `entry ${entry.id} createdAt`),
-    }));
-    try {
-      console.log('[DataProvider] Stringified attendance entries to save:', JSON.stringify(entriesToSave));
-      localStorage.setItem(ATTENDANCE_ENTRIES_STORAGE_KEY, JSON.stringify(entriesToSave));
-      console.log('[DataProvider] Attendance entries successfully saved to localStorage.');
-    } catch (error) {
-      console.error("[DataProvider] Failed to save attendance entries to localStorage:", error);
-    }
-  }, [attendanceEntries]);
-
-
-  const addLaborProfile = (profileData: Omit<LaborProfile, 'id' | 'createdAt'>) => {
-    const newProfile: LaborProfile = {
-      ...profileData,
-      id: Date.now().toString() + Math.random().toString(36).substring(2, 9),
-      createdAt: new Date(),
-    };
-    console.log('[DataProvider] Adding new labor profile:', newProfile);
-    setLaborProfiles((prev) => [...prev, newProfile]);
   };
 
-  const addAttendanceEntry = (entryData: { laborId: string; date: Date; status: AttendanceStatus; workDetails?: string; advanceAmount?: number; }) => {
-    const labor = laborProfiles.find(lp => lp.id === entryData.laborId);
-    const newEntry: AttendanceEntry = {
-      laborId: entryData.laborId,
-      date: entryData.date, // Assuming date is already a valid Date object from the form
-      status: entryData.status,
-      workDetails: entryData.workDetails || "",
-      advanceAmount: entryData.advanceAmount,
-      id: Date.now().toString() + Math.random().toString(36).substring(2, 9),
-      laborName: labor?.name || 'Unknown Labor',
-      createdAt: new Date(),
+  const fetchAttendanceEntries = async () => {
+    if (!user?.id) return;
+    console.log('[DataProvider] Fetching attendance entries...');
+    const { data, error } = await supabase
+      .from('attendance_entries')
+      .select(`
+        id, 
+        labor_id, 
+        labor_name,
+        date, 
+        status, 
+        work_details, 
+        advance_amount, 
+        created_at,
+        user_id
+      `)
+      .eq('user_id', user.id) // Assuming RLS uses user_id
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('[DataProvider] Error fetching attendance entries:', error);
+      toast({ variant: "destructive", title: "Error", description: "Could not fetch attendance entries." });
+      setAttendanceEntries([]);
+    } else {
+      console.log('[DataProvider] Fetched attendance entries:', data);
+      setAttendanceEntries(data || []);
+    }
+  };
+
+  useEffect(() => {
+    const loadData = async () => {
+      setIsLoading(true);
+      if (user?.id) { // Only attempt to load data if user is available for RLS
+        await fetchLaborProfiles();
+        await fetchAttendanceEntries();
+      } else {
+        // If no user, clear data or handle as appropriate
+        setLaborProfiles([]);
+        setAttendanceEntries([]);
+      }
+      setIsLoading(false);
+      console.log('[DataProvider] Initial data load complete.');
     };
-    console.log('[DataProvider] Adding new attendance entry:', newEntry);
-    setAttendanceEntries((prev) => [...prev, newEntry]);
+    loadData();
+  }, [user]); // Reload data when user changes
+
+  const uploadFile = async (file: File, profileName: string): Promise<string | undefined> => {
+    if (!user?.id) {
+      toast({ variant: "destructive", title: "Auth Error", description: "User not authenticated for file upload." });
+      return undefined;
+    }
+    // Sanitize profileName for use in path
+    const sanitizedProfileName = profileName.replace(/[^a-zA-Z0-9-_]/g, '_');
+    const fileName = `${user.id}/${sanitizedProfileName}_${Date.now()}_${file.name}`;
+    
+    console.log(`[DataProvider] Uploading file: ${fileName} to bucket: ${STORAGE_BUCKET_NAME}`);
+    const { data, error } = await supabase.storage
+      .from(STORAGE_BUCKET_NAME)
+      .upload(fileName, file);
+
+    if (error) {
+      console.error('[DataProvider] Error uploading file:', error);
+      toast({ variant: "destructive", title: "Upload Error", description: `Could not upload ${file.name}: ${error.message}` });
+      return undefined;
+    }
+
+    console.log('[DataProvider] File uploaded successfully:', data);
+    const { data: { publicUrl } } = supabase.storage.from(STORAGE_BUCKET_NAME).getPublicUrl(fileName);
+    console.log('[DataProvider] Public URL:', publicUrl);
+    return publicUrl;
+  };
+
+  const addLaborProfile = async (profileFormData: LaborProfileFormDataWithFiles) => {
+    if (!user?.id) {
+      toast({ variant: "destructive", title: "Auth Error", description: "User not authenticated." });
+      return;
+    }
+    console.log('[DataProvider] Adding new labor profile:', profileFormData);
+    setIsLoading(true);
+
+    let photo_url: string | undefined = undefined;
+    if (profileFormData.photo instanceof File) {
+      photo_url = await uploadFile(profileFormData.photo, profileFormData.name);
+    }
+
+    let aadhaar_url: string | undefined = undefined;
+    if (profileFormData.aadhaar instanceof File) {
+      aadhaar_url = await uploadFile(profileFormData.aadhaar, profileFormData.name);
+    }
+
+    let pan_url: string | undefined = undefined;
+    if (profileFormData.pan instanceof File) {
+      pan_url = await uploadFile(profileFormData.pan, profileFormData.name);
+    }
+
+    let driving_license_url: string | undefined = undefined;
+    if (profileFormData.drivingLicense instanceof File) {
+      driving_license_url = await uploadFile(profileFormData.drivingLicense, profileFormData.name);
+    }
+
+    const profileToInsert = {
+      user_id: user.id,
+      name: profileFormData.name,
+      contact: profileFormData.contact,
+      photo_url,
+      aadhaar_url,
+      pan_url,
+      driving_license_url,
+      // created_at will be set by Supabase default
+    };
+    
+    console.log('[DataProvider] Profile to insert into Supabase:', profileToInsert);
+
+    const { data, error } = await supabase
+      .from('labor_profiles')
+      .insert(profileToInsert)
+      .select()
+      .single(); // Assuming insert returns the new row
+
+    if (error) {
+      console.error('[DataProvider] Error adding labor profile:', error);
+      toast({ variant: "destructive", title: "Error", description: `Could not add labor profile: ${error.message}` });
+    } else if (data) {
+      console.log('[DataProvider] Labor profile added successfully to Supabase:', data);
+      // setLaborProfiles((prev) => [data, ...prev]); // Optimistic update or re-fetch
+      await fetchLaborProfiles(); // Re-fetch to ensure consistency
+      toast({ title: "Success", description: "Labor profile added." });
+    }
+    setIsLoading(false);
+  };
+
+  const addAttendanceEntry = async (entryData: Omit<AttendanceEntry, 'id' | 'created_at' | 'user_id'>) => {
+     if (!user?.id) {
+      toast({ variant: "destructive", title: "Auth Error", description: "User not authenticated." });
+      return;
+    }
+    console.log('[DataProvider] Adding new attendance entry:', entryData);
+    setIsLoading(true);
+
+    const entryToInsert = {
+      ...entryData,
+      user_id: user.id,
+      date: new Date(entryData.date).toISOString().split('T')[0], // Ensure date is in 'YYYY-MM-DD' format for Supabase 'date' type
+      // created_at will be set by Supabase default
+    };
+
+    console.log('[DataProvider] Attendance entry to insert into Supabase:', entryToInsert);
+
+    const { data, error } = await supabase
+      .from('attendance_entries')
+      .insert(entryToInsert)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('[DataProvider] Error adding attendance entry:', error);
+      toast({ variant: "destructive", title: "Error", description: `Could not add attendance entry: ${error.message}` });
+    } else if (data) {
+      console.log('[DataProvider] Attendance entry added successfully to Supabase:', data);
+      // setAttendanceEntries((prev) => [data, ...prev]); // Optimistic update or re-fetch
+      await fetchAttendanceEntries(); // Re-fetch
+      toast({ title: "Success", description: "Attendance entry recorded." });
+    }
+    setIsLoading(false);
   };
 
   return (

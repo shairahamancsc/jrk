@@ -8,7 +8,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { FileText, UserCircle2, Users, Loader2 } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import Image from 'next/image';
 
 export default function LaborPage() {
@@ -16,53 +16,45 @@ export default function LaborPage() {
   const [clientLoading, setClientLoading] = useState(true);
 
   useEffect(() => {
+    // This effect handles the initial perceived loading state on the client
+    // It waits for the DataProvider's loading to finish.
     if (!dataLoading) {
       setClientLoading(false);
     }
   }, [dataLoading]);
 
-  const getFileDisplay = (file?: File | string) => {
-    if (!file) return <span className="text-muted-foreground text-xs">Not Provided</span>;
+  const getFileDisplay = (fileUrl?: string) => {
+    if (!fileUrl) return <span className="text-muted-foreground text-xs">Not Provided</span>;
     
-    if (typeof file === 'string') {
-      if (file.startsWith('https://placehold.co') || file.startsWith('http')) {
-         return <Image src={file} alt="document" width={20} height={20} data-ai-hint="document icon" className="rounded" />;
-      }
-      // It's a filename string
-      return <span className="text-xs flex items-center gap-1"><FileText size={14} /> {file}</span>;
-    }
-    
-    // If it's a File object (only available before saving to localStorage or if not reloaded yet)
-    if (file instanceof File) {
+    // Check if it's a placeholder or an actual URL (likely from Supabase Storage)
+    if (fileUrl.startsWith('https://placehold.co') || fileUrl.startsWith('http')) {
+      // For actual Supabase URLs, you might want to show a generic icon or a link
+      const fileName = fileUrl.substring(fileUrl.lastIndexOf('/') + 1).split('?')[0]; // Basic file name extraction
       return (
-        <a
-          href={URL.createObjectURL(file)}
-          target="_blank"
+        <a 
+          href={fileUrl} 
+          target="_blank" 
           rel="noopener noreferrer"
           className="text-accent hover:underline flex items-center gap-1 text-xs"
+          data-ai-hint="document icon"
         >
-          <FileText size={14} /> View Document
+          <FileText size={14} /> {decodeURIComponent(fileName.substring(fileName.indexOf('_', fileName.indexOf('_') + 1) + 1))}
         </a>
       );
     }
-    return <span className="text-muted-foreground text-xs">Invalid File Data</span>;
+    // Fallback for unexpected string format
+    return <span className="text-xs flex items-center gap-1"><FileText size={14} /> {fileUrl}</span>;
   };
 
-  const getAvatarSrc = (photo?: File | string): string => {
-    if (!photo) return '';
-    if (typeof photo === 'string') {
-      if (photo.startsWith('http') || photo.startsWith('data:image') || photo.startsWith('https://placehold.co')) {
-        return photo;
-      }
-      return ''; // Filename string, cannot be used as src, trigger fallback
+  const getAvatarSrc = (photoUrl?: string): string => {
+    if (!photoUrl) return '';
+    if (photoUrl.startsWith('http') || photoUrl.startsWith('data:image')) { // Handles Supabase URLs & placeholders
+      return photoUrl;
     }
-    if (photo instanceof File) {
-      return URL.createObjectURL(photo);
-    }
-    return '';
+    return ''; // Fallback if not a URL
   }
   
-  if (clientLoading) {
+  if (clientLoading || dataLoading) { // Keep showing loader if either client is initializing or data is loading
     return (
       <div className="flex h-[calc(100vh-theme(spacing.14)-2*theme(spacing.4))] items-center justify-center">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -106,7 +98,7 @@ export default function LaborPage() {
                       <TableCell>
                         <Avatar className="h-10 w-10">
                           <AvatarImage 
-                            src={getAvatarSrc(profile.photo)}
+                            src={getAvatarSrc(profile.photo_url)}
                             alt={profile.name} 
                             data-ai-hint="profile person"
                           />
@@ -117,10 +109,10 @@ export default function LaborPage() {
                       </TableCell>
                       <TableCell className="font-medium">{profile.name}</TableCell>
                       <TableCell>{profile.contact}</TableCell>
-                      <TableCell>{getFileDisplay(profile.aadhaar)}</TableCell>
-                      <TableCell>{getFileDisplay(profile.pan)}</TableCell>
-                      <TableCell>{getFileDisplay(profile.drivingLicense)}</TableCell>
-                      <TableCell>{profile.createdAt ? format(new Date(profile.createdAt), "PP") : 'N/A'}</TableCell>
+                      <TableCell>{getFileDisplay(profile.aadhaar_url)}</TableCell>
+                      <TableCell>{getFileDisplay(profile.pan_url)}</TableCell>
+                      <TableCell>{getFileDisplay(profile.driving_license_url)}</TableCell>
+                      <TableCell>{profile.created_at ? format(parseISO(profile.created_at), "PP") : 'N/A'}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

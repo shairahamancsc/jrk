@@ -1,20 +1,23 @@
+
 "use client";
 
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { laborProfileSchema, type LaborProfileFormData } from '@/schemas/labor-schema';
+import { laborProfileSchema, type LaborProfileFormData } from '@/schemas/labor-schema'; // FormData still uses File type for input
 import { useData } from '@/contexts/data-context';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useToast } from "@/hooks/use-toast";
-import { UserPlus, FileText } from 'lucide-react';
-import type { LaborProfile } from '@/types';
+import { UserPlus, FileText, Loader2 } from 'lucide-react';
+import type { LaborProfileFormDataWithFiles } from '@/types'; // For passing to context
+import { useState } from 'react';
 
 export function LaborProfileForm() {
   const { addLaborProfile } = useData();
   const { toast } = useToast();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const form = useForm<LaborProfileFormData>({
     resolver: zodResolver(laborProfileSchema),
@@ -28,22 +31,28 @@ export function LaborProfileForm() {
     },
   });
 
-  const onSubmit = (data: LaborProfileFormData) => {
-    // After Zod transformation, data.photo, data.aadhaar, etc., are File | undefined
-    const profileData: Omit<LaborProfile, 'id' | 'createdAt'> = {
+  const onSubmit = async (data: LaborProfileFormData) => {
+    setIsSubmitting(true);
+    const profileDataForContext: LaborProfileFormDataWithFiles = {
       name: data.name,
       contact: data.contact,
+      // Zod schema ensures these are File | undefined after transformation
       photo: data.photo, 
       aadhaar: data.aadhaar,
       pan: data.pan,
       drivingLicense: data.drivingLicense,
     };
-    addLaborProfile(profileData); 
-    toast({
-      title: "Profile Added",
-      description: `${data.name}'s profile has been successfully created.`,
-    });
-    form.reset();
+
+    try {
+      await addLaborProfile(profileDataForContext); 
+      // Toast is handled by DataProvider now
+      form.reset();
+    } catch (error) {
+      // Error toast is handled by DataProvider
+      console.error("Submission error in form:", error);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
   
   const FileInput = ({ field, label }: { field: any; label: string }) => (
@@ -56,13 +65,12 @@ export function LaborProfileForm() {
           type="file" 
           accept="image/*,application/pdf"
           className="file:text-primary file:font-semibold file:mr-2 file:border-0 file:bg-accent file:text-accent-foreground file:rounded-md file:px-2 file:py-1 hover:file:bg-accent/80"
-          {...form.register(field.name)} // RHF handles FileList here
+          {...form.register(field.name)} 
         />
       </FormControl>
       <FormMessage />
     </FormItem>
   );
-
 
   return (
     <Card className="shadow-lg w-full">
@@ -70,7 +78,7 @@ export function LaborProfileForm() {
         <CardTitle className="flex items-center gap-2 text-2xl text-primary font-headline">
           <UserPlus /> Add New Labor Profile
         </CardTitle>
-        <CardDescription>Enter the details of the new labor.</CardDescription>
+        <CardDescription>Enter the details of the new labor. Stored securely on server.</CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
@@ -83,7 +91,7 @@ export function LaborProfileForm() {
                   <FormItem>
                     <FormLabel className="text-foreground">Full Name</FormLabel>
                     <FormControl>
-                      <Input placeholder="Enter full name" {...field} />
+                      <Input placeholder="Enter full name" {...field} disabled={isSubmitting} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -96,7 +104,7 @@ export function LaborProfileForm() {
                   <FormItem>
                     <FormLabel className="text-foreground">Contact Number</FormLabel>
                     <FormControl>
-                      <Input placeholder="Enter contact number" {...field} />
+                      <Input placeholder="Enter contact number" {...field} disabled={isSubmitting} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -128,8 +136,13 @@ export function LaborProfileForm() {
               />
             </div>
             
-            <Button type="submit" className="w-full md:w-auto bg-primary hover:bg-primary/90 text-base py-3 px-6">
-              Add Labor Profile
+            <Button 
+              type="submit" 
+              className="w-full md:w-auto bg-primary hover:bg-primary/90 text-base py-3 px-6"
+              disabled={isSubmitting}
+            >
+              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {isSubmitting ? "Adding..." : "Add Labor Profile"}
             </Button>
           </form>
         </Form>

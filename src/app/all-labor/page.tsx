@@ -7,8 +7,8 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { FileText, UserCircle2, Users, Loader2 } from 'lucide-react';
-import { format } from 'date-fns';
-import Image from 'next/image';
+import { format, parseISO } from 'date-fns';
+import Image from 'next/image'; // Keep for placehold.co if still used or as example
 
 export default function AllLaborPage() {
   const { laborProfiles, isLoading: dataLoading } = useData();
@@ -20,48 +20,35 @@ export default function AllLaborPage() {
     }
   }, [dataLoading]);
 
-  const getFileDisplay = (file?: File | string) => {
-    if (!file) return <span className="text-muted-foreground text-xs">Not Provided</span>;
+  const getFileDisplay = (fileUrl?: string) => {
+    if (!fileUrl) return <span className="text-muted-foreground text-xs">Not Provided</span>;
     
-    if (typeof file === 'string') {
-      if (file.startsWith('https://placehold.co') || file.startsWith('http')) {
-         return <Image src={file} alt="document" width={20} height={20} data-ai-hint="document icon" className="rounded" />;
-      }
-      // It's a filename string
-      return <span className="text-xs flex items-center gap-1"><FileText size={14} /> {file}</span>;
-    }
-    
-    // If it's a File object (only available before saving to localStorage or if not reloaded yet)
-    if (file instanceof File) {
+    if (fileUrl.startsWith('https://placehold.co') || fileUrl.startsWith('http')) {
+       const fileName = fileUrl.substring(fileUrl.lastIndexOf('/') + 1).split('?')[0];
       return (
-        <a
-          href={URL.createObjectURL(file)}
-          target="_blank"
+        <a 
+          href={fileUrl} 
+          target="_blank" 
           rel="noopener noreferrer"
           className="text-accent hover:underline flex items-center gap-1 text-xs"
+          data-ai-hint="document icon"
         >
-          <FileText size={14} /> View Document
+          <FileText size={14} /> {decodeURIComponent(fileName.substring(fileName.indexOf('_', fileName.indexOf('_') + 1) + 1))}
         </a>
       );
     }
-    return <span className="text-muted-foreground text-xs">Invalid File Data</span>;
+    return <span className="text-xs flex items-center gap-1"><FileText size={14} /> {fileUrl}</span>;
   };
 
-  const getAvatarSrc = (photo?: File | string): string => {
-    if (!photo) return '';
-    if (typeof photo === 'string') {
-      if (photo.startsWith('http') || photo.startsWith('data:image') || photo.startsWith('https://placehold.co')) {
-        return photo;
-      }
-      return ''; // Filename string, cannot be used as src, trigger fallback
-    }
-    if (photo instanceof File) {
-      return URL.createObjectURL(photo);
+  const getAvatarSrc = (photoUrl?: string): string => {
+    if (!photoUrl) return '';
+    if (photoUrl.startsWith('http') || photoUrl.startsWith('data:image')) {
+      return photoUrl;
     }
     return '';
   }
   
-  if (clientLoading) {
+  if (clientLoading || dataLoading) {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -108,7 +95,7 @@ export default function AllLaborPage() {
                       <TableCell>
                         <Avatar className="h-12 w-12">
                           <AvatarImage 
-                            src={getAvatarSrc(profile.photo)}
+                            src={getAvatarSrc(profile.photo_url)}
                             alt={profile.name}
                             data-ai-hint="profile person"
                           />
@@ -119,10 +106,10 @@ export default function AllLaborPage() {
                       </TableCell>
                       <TableCell className="font-medium text-base">{profile.name}</TableCell>
                       <TableCell className="text-sm">{profile.contact}</TableCell>
-                      <TableCell>{getFileDisplay(profile.aadhaar)}</TableCell>
-                      <TableCell>{getFileDisplay(profile.pan)}</TableCell>
-                      <TableCell>{getFileDisplay(profile.drivingLicense)}</TableCell>
-                      <TableCell className="text-sm">{profile.createdAt ? format(new Date(profile.createdAt), "PP") : 'N/A'}</TableCell>
+                      <TableCell>{getFileDisplay(profile.aadhaar_url)}</TableCell>
+                      <TableCell>{getFileDisplay(profile.pan_url)}</TableCell>
+                      <TableCell>{getFileDisplay(profile.driving_license_url)}</TableCell>
+                      <TableCell className="text-sm">{profile.created_at ? format(parseISO(profile.created_at), "PP") : 'N/A'}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

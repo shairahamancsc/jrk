@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useEffect, useCallback } from 'react';
+import React, { useEffect, useCallback, useState } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { batchAttendanceSchema, type BatchAttendanceFormData } from '@/schemas/attendance-schema';
@@ -16,23 +16,23 @@ import { Calendar } from '@/components/ui/calendar';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from "@/hooks/use-toast";
-import { CalendarCheck, CalendarIcon, Users, FileText } from 'lucide-react';
+import { CalendarCheck, CalendarIcon, Users, FileText, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
-import type { LaborProfile } from '@/types';
+import type { LaborProfile } from '@/types'; // Ensure this is the updated type
 import { Table, TableBody, TableCell, TableHeader, TableHead, TableRow } from '@/components/ui/table';
 
-
 export function AttendanceForm() {
-  const { laborProfiles, addAttendanceEntry } = useData();
-  const { toast } = useToast();
+  const { laborProfiles, addAttendanceEntry, isLoading } = useData(); // isLoading from context for button state
+  const { toast } = useToast(); // local toast for form-specific validation
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const generateDefaultValues = useCallback((profiles: LaborProfile[], currentDate?: Date) => {
     return {
       date: currentDate || new Date(),
       workDetails: "", 
       attendances: profiles.map(profile => ({
-        laborId: profile.id,
+        laborId: profile.id, // Supabase ID will be string (uuid)
         laborName: profile.name,
         status: undefined,
         advanceAmount: undefined,
@@ -42,48 +42,65 @@ export function AttendanceForm() {
 
   const form = useForm<BatchAttendanceFormData>({
     resolver: zodResolver(batchAttendanceSchema),
-    defaultValues: generateDefaultValues(laborProfiles, new Date()),
+    defaultValues: generateDefaultValues(laborProfiles, new Date()), // Initial default
   });
 
-  const { fields } = useFieldArray({
+  const { fields, replace } = useFieldArray({
     control: form.control,
     name: "attendances",
   });
 
+  // Re-populate form fields when laborProfiles change or date changes
   useEffect(() => {
-    form.reset(generateDefaultValues(laborProfiles, form.getValues('date')));
-  }, [laborProfiles, form.reset, generateDefaultValues, form]);
+    const newDefaultValues = generateDefaultValues(laborProfiles, form.getValues('date'));
+    // form.reset(newDefaultValues); // This might be too aggressive
+    replace(newDefaultValues.attendances); // More targeted update
+  }, [laborProfiles, form, replace, generateDefaultValues]);
 
-  const onSubmit = (data: BatchAttendanceFormData) => {
+
+  const onSubmit = async (data: BatchAttendanceFormData) => {
+    setIsSubmitting(true);
     let entriesRecordedCount = 0;
     const sharedWorkDetails = data.workDetails || ""; 
 
-    data.attendances.forEach(att => {
-      if (att.status || (att.advanceAmount !== undefined && att.advanceAmount > 0)) { 
-        addAttendanceEntry({
-          laborId: att.laborId,
-          date: data.date,
-          status: att.status!, 
-          workDetails: sharedWorkDetails,
-          advanceAmount: att.advanceAmount,
-        });
-        entriesRecordedCount++;
-      }
-    });
+    const entriesToProcess = data.attendances.filter(
+      att => att.status || (att.advanceAmount !== undefined && att.advanceAmount > 0)
+    );
 
-    if (entriesRecordedCount > 0) {
+    if (entriesToProcess.length === 0) {
       toast({
-        title: "Attendance Recorded",
-        description: `${entriesRecordedCount} attendance record(s) for ${format(data.date, "PPP")} have been processed.`,
-      });
-      form.reset(generateDefaultValues(laborProfiles, new Date())); 
-    } else {
-       toast({
         variant: "destructive",
         title: "No Attendance Marked or Advance Given",
         description: "Please select a status or enter an advance for at least one labor.",
       });
+      setIsSubmitting(false);
+      return;
     }
+
+    for (const att of entriesToProcess) {
+        await addAttendanceEntry({
+          labor_id: att.laborId,
+          labor_name: att.laborName, // Pass labor_name
+          date: data.date.toISOString(), // Pass date as ISO string
+          status: att.status!, 
+          work_details: sharedWorkDetails,
+          advance_amount: att.advanceAmount,
+        });
+        entriesRecordedCount++;
+    }
+    
+    // Toast for success/failure is handled by DataProvider now
+    if (entriesRecordedCount > 0) {
+        // form.reset(generateDefaultValues(laborProfiles, new Date())); 
+        // Reset just workDetails and clear selections
+        form.reset({
+            ...generateDefaultValues(laborProfiles, new Date()), // Reset to new defaults for current date
+            date: new Date(), // Ensure date is reset to today
+            workDetails: "" // Clear work details
+        });
+        replace(generateDefaultValues(laborProfiles, new Date()).attendances); // Reset array fields explicitly
+    }
+    setIsSubmitting(false);
   };
 
   return (
@@ -110,6 +127,7 @@ export function AttendanceForm() {
                       <FormControl>
                         <Button
                           variant={"outline"}
+                          disabled={isSubmitting || isLoading}
                           className={cn(
                             "w-full pl-3 text-left font-normal",
                             !field.value && "text-muted-foreground"
@@ -130,7 +148,9 @@ export function AttendanceForm() {
                         selected={field.value}
                         onSelect={(date) => {
                           field.onChange(date);
-                          form.reset(generateDefaultValues(laborProfiles, date));
+                          const newDefaults = generateDefaultValues(laborProfiles, date);
+                          // form.reset(newDefaults); // Update the whole form if date changes
+                          replace(newDefaults.attendances);
                         }}
                         disabled={(date) =>
                           date > new Date() || date < new Date("1900-01-01")
@@ -159,8 +179,8 @@ export function AttendanceForm() {
                       <TableRow key={item.id}>
                         <TableCell className="font-medium py-3 align-top">
                            <FormLabel htmlFor={`attendances.${index}.status`} className="text-sm">
-                            {item.laborName}
-                          </FormLabel>
+                            {item.laborName} 
+                           </FormLabel>
                         </TableCell>
                         <TableCell className="py-3 align-top">
                           <FormField
@@ -174,6 +194,7 @@ export function AttendanceForm() {
                                     value={field.value}
                                     className="flex flex-col space-y-1 sm:flex-row sm:space-x-2 sm:space-y-0"
                                     id={`attendances.${index}.status`}
+                                    disabled={isSubmitting || isLoading}
                                   >
                                     {(['present', 'absent'] as const).map((statusValue) => (
                                       <FormItem key={statusValue} className="flex items-center space-x-2 space-y-0">
@@ -206,12 +227,13 @@ export function AttendanceForm() {
                                       type="number"
                                       placeholder="Enter amount"
                                       {...field}
-                                      value={field.value === undefined ? '' : String(field.value)}
+                                      value={field.value === undefined || field.value === null ? '' : String(field.value)}
                                       onChange={event => {
                                         const value = event.target.value;
                                         field.onChange(value === '' ? undefined : parseFloat(value));
                                       }}
                                       className="pl-7 text-xs w-full max-w-[180px]" 
+                                      disabled={isSubmitting || isLoading}
                                     />
                                     </div>
                                   </FormControl>
@@ -246,14 +268,20 @@ export function AttendanceForm() {
                           placeholder="Enter common work details for all marked labors..."
                           className="resize-none"
                           {...field}
+                          disabled={isSubmitting || isLoading}
                         />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-                <Button type="submit" className="w-full md:w-auto bg-primary hover:bg-primary/90 text-base py-3 px-6">
-                Record All Marked Entries
+                <Button 
+                  type="submit" 
+                  className="w-full md:w-auto bg-primary hover:bg-primary/90 text-base py-3 px-6"
+                  disabled={isSubmitting || isLoading || laborProfiles.length === 0}
+                >
+                  {(isSubmitting || isLoading) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {(isSubmitting || isLoading) ? "Processing..." : "Record All Marked Entries"}
                 </Button>
               </>
             )}
