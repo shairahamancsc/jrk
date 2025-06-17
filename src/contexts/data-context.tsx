@@ -4,7 +4,7 @@
 import type { ReactNode } from 'react';
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase/client';
-import type { LaborProfile, AttendanceEntry, AttendanceStatus, LaborProfileFormDataWithFiles } from '@/types';
+import type { LaborProfile, AttendanceEntry, LaborProfileFormDataWithFiles } from '@/types';
 import { useAuth } from './auth-context'; // To get user_id for RLS
 import { useToast } from "@/hooks/use-toast";
 
@@ -18,7 +18,7 @@ interface DataContextType {
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
-const STORAGE_BUCKET_NAME = 'profile_documents'; // Ensure this bucket exists in your Supabase project
+const STORAGE_BUCKET_NAME = 'profile_documents'; // Confirmed by user
 
 export const DataProvider = ({ children }: { children: ReactNode }) => {
   const [laborProfiles, setLaborProfiles] = useState<LaborProfile[]>([]);
@@ -28,12 +28,16 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   const { toast } = useToast();
 
   const fetchLaborProfiles = async () => {
-    if (!user?.id) return; // Don't fetch if no user, RLS might block
-    console.log('[DataProvider] Fetching labor profiles...');
+    if (!user?.id) {
+      console.log('[DataProvider] No user, skipping fetchLaborProfiles.');
+      setLaborProfiles([]);
+      return;
+    }
+    console.log('[DataProvider] Fetching labor profiles for user:', user.id);
     const { data, error } = await supabase
       .from('labor_profiles')
       .select('*')
-      .eq('user_id', user.id) // Assuming RLS uses user_id
+      .eq('user_id', user.id)
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -47,22 +51,16 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const fetchAttendanceEntries = async () => {
-    if (!user?.id) return;
-    console.log('[DataProvider] Fetching attendance entries...');
+    if (!user?.id) {
+      console.log('[DataProvider] No user, skipping fetchAttendanceEntries.');
+      setAttendanceEntries([]);
+      return;
+    }
+    console.log('[DataProvider] Fetching attendance entries for user:', user.id);
     const { data, error } = await supabase
       .from('attendance_entries')
-      .select(`
-        id, 
-        labor_id, 
-        labor_name,
-        date, 
-        status, 
-        work_details, 
-        advance_amount, 
-        created_at,
-        user_id
-      `)
-      .eq('user_id', user.id) // Assuming RLS uses user_id
+      .select('*') // Select all fields, including labor_name if it's on the table
+      .eq('user_id', user.id)
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -77,34 +75,38 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     const loadData = async () => {
+      console.log('[DataProvider] Initial data load effect starting. User:', user);
       setIsLoading(true);
-      if (user?.id) { // Only attempt to load data if user is available for RLS
+      if (user?.id) {
         await fetchLaborProfiles();
         await fetchAttendanceEntries();
       } else {
-        // If no user, clear data or handle as appropriate
+        // Clear data if no user is logged in (e.g., after logout)
         setLaborProfiles([]);
         setAttendanceEntries([]);
+        console.log('[DataProvider] No user, cleared local data states.');
       }
       setIsLoading(false);
-      console.log('[DataProvider] Initial data load complete.');
+      console.log('[DataProvider] Initial data load complete. isLoading:', false);
     };
     loadData();
-  }, [user]); // Reload data when user changes
+  }, [user]); // Re-run when user object changes (login/logout)
 
   const uploadFile = async (file: File, profileName: string): Promise<string | undefined> => {
     if (!user?.id) {
       toast({ variant: "destructive", title: "Auth Error", description: "User not authenticated for file upload." });
       return undefined;
     }
-    // Sanitize profileName for use in path
     const sanitizedProfileName = profileName.replace(/[^a-zA-Z0-9-_]/g, '_');
-    const fileName = `${user.id}/${sanitizedProfileName}_${Date.now()}_${file.name}`;
+    const fileName = `public/${user.id}/${sanitizedProfileName}_${Date.now()}_${file.name}`; // Ensure 'public/' prefix if bucket is public
     
     console.log(`[DataProvider] Uploading file: ${fileName} to bucket: ${STORAGE_BUCKET_NAME}`);
     const { data, error } = await supabase.storage
       .from(STORAGE_BUCKET_NAME)
-      .upload(fileName, file);
+      .upload(fileName, file, {
+        cacheControl: '3600',
+        upsert: false,
+      });
 
     if (error) {
       console.error('[DataProvider] Error uploading file:', error);
@@ -113,6 +115,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     }
 
     console.log('[DataProvider] File uploaded successfully:', data);
+    // Get public URL. Ensure path matches exactly what was uploaded.
     const { data: { publicUrl } } = supabase.storage.from(STORAGE_BUCKET_NAME).getPublicUrl(fileName);
     console.log('[DataProvider] Public URL:', publicUrl);
     return publicUrl;
@@ -163,15 +166,14 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       .from('labor_profiles')
       .insert(profileToInsert)
       .select()
-      .single(); // Assuming insert returns the new row
+      .single();
 
     if (error) {
       console.error('[DataProvider] Error adding labor profile:', error);
       toast({ variant: "destructive", title: "Error", description: `Could not add labor profile: ${error.message}` });
     } else if (data) {
       console.log('[DataProvider] Labor profile added successfully to Supabase:', data);
-      // setLaborProfiles((prev) => [data, ...prev]); // Optimistic update or re-fetch
-      await fetchLaborProfiles(); // Re-fetch to ensure consistency
+      await fetchLaborProfiles(); // Re-fetch to ensure consistency and get new 'created_at'
       toast({ title: "Success", description: "Labor profile added." });
     }
     setIsLoading(false);
@@ -185,10 +187,16 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     console.log('[DataProvider] Adding new attendance entry:', entryData);
     setIsLoading(true);
 
+    const labor = laborProfiles.find(lp => lp.id === entryData.labor_id);
+
     const entryToInsert = {
-      ...entryData,
       user_id: user.id,
-      date: new Date(entryData.date).toISOString().split('T')[0], // Ensure date is in 'YYYY-MM-DD' format for Supabase 'date' type
+      labor_id: entryData.labor_id,
+      labor_name: labor?.name || entryData.labor_name || 'Unknown Labor', // Ensure labor_name is included
+      date: new Date(entryData.date).toISOString().split('T')[0],
+      status: entryData.status,
+      work_details: entryData.work_details,
+      advance_amount: entryData.advance_amount,
       // created_at will be set by Supabase default
     };
 
@@ -205,7 +213,6 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       toast({ variant: "destructive", title: "Error", description: `Could not add attendance entry: ${error.message}` });
     } else if (data) {
       console.log('[DataProvider] Attendance entry added successfully to Supabase:', data);
-      // setAttendanceEntries((prev) => [data, ...prev]); // Optimistic update or re-fetch
       await fetchAttendanceEntries(); // Re-fetch
       toast({ title: "Success", description: "Attendance entry recorded." });
     }
@@ -226,3 +233,5 @@ export const useData = () => {
   }
   return context;
 };
+
+    
