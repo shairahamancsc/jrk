@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { FileText, UserCircle2, Users, Loader2 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
-import Image from 'next/image'; // Keep for placehold.co if still used or as example
+import Image from 'next/image';
 
 export default function AllLaborPage() {
   const { laborProfiles, isLoading: dataLoading } = useData();
@@ -83,9 +83,11 @@ export default function AllLaborPage() {
                     <TableHead>Photo</TableHead>
                     <TableHead>Name</TableHead>
                     <TableHead>Contact</TableHead>
-                    <TableHead>Aadhaar</TableHead>
-                    <TableHead>PAN</TableHead>
-                    <TableHead>License</TableHead>
+                    <TableHead className="whitespace-nowrap">Aadhaar No.</TableHead>
+                    <TableHead className="whitespace-nowrap">PAN No.</TableHead>
+                    <TableHead>Aadhaar Doc</TableHead>
+                    <TableHead>PAN Doc</TableHead>
+                    <TableHead>License Doc</TableHead>
                     <TableHead>Added On</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -106,6 +108,8 @@ export default function AllLaborPage() {
                       </TableCell>
                       <TableCell className="font-medium text-base">{profile.name}</TableCell>
                       <TableCell className="text-sm">{profile.contact}</TableCell>
+                      <TableCell className="text-sm">{profile.aadhaar_number || <span className="text-muted-foreground text-xs">N/A</span>}</TableCell>
+                      <TableCell className="text-sm">{profile.pan_number || <span className="text-muted-foreground text-xs">N/A</span>}</TableCell>
                       <TableCell>{getFileDisplay(profile.aadhaar_url)}</TableCell>
                       <TableCell>{getFileDisplay(profile.pan_url)}</TableCell>
                       <TableCell>{getFileDisplay(profile.driving_license_url)}</TableCell>

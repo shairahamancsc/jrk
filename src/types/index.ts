@@ -1,36 +1,34 @@
 
-
 export type UserRole = 'admin' | 'supervisor';
 
 export interface LaborProfile {
-  id: string; // Typically UUID from Supabase
+  id: string; 
   name: string;
   contact: string;
-  photo_url?: string; // URL from Supabase Storage
-  aadhaar_url?: string; // URL from Supabase Storage
-  pan_url?: string; // URL from Supabase Storage
-  driving_license_url?: string; // URL from Supabase Storage
-  created_at: string; // ISO string from Supabase, will be converted to Date in app
-  user_id?: string; // To associate with a user for RLS
+  aadhaar_number?: string; // New field for Aadhaar number
+  pan_number?: string;     // New field for PAN number
+  photo_url?: string; 
+  aadhaar_url?: string; 
+  pan_url?: string; 
+  driving_license_url?: string; 
+  created_at: string; 
+  user_id?: string; 
 }
 
 export type AttendanceStatus = 'present' | 'absent';
 
 export interface AttendanceEntry {
-  id: string; // Typically UUID from Supabase
-  labor_id: string; // Links to LaborProfile id
-  labor_name?: string; // For display purposes, might be joined or manually set
-  date: string; // ISO string from Supabase, will be converted to Date in app
+  id: string; 
+  labor_id: string; 
+  labor_name?: string; 
+  date: string; 
   status: AttendanceStatus;
   work_details?: string;
   advance_amount?: number;
-  created_at: string; // ISO string from Supabase, will be converted to Date in app
-  user_id?: string; // To associate with a user for RLS
+  created_at: string; 
+  user_id?: string; 
 }
 
-// Placeholder for Supabase generated types.
-// You would generate this with: npx supabase gen types typescript --project-id <your-project-id> --schema public > src/types/supabase.ts
-// For now, we'll use a minimal version.
 export type Json =
   | string
   | number
@@ -48,6 +46,8 @@ export type Database = {
           user_id: string | null
           name: string
           contact: string
+          aadhaar_number: string | null // Added
+          pan_number: string | null     // Added
           photo_url: string | null
           aadhaar_url: string | null
           pan_url: string | null
@@ -59,6 +59,8 @@ export type Database = {
           user_id?: string | null
           name: string
           contact: string
+          aadhaar_number?: string | null // Added
+          pan_number?: string | null     // Added
           photo_url?: string | null
           aadhaar_url?: string | null
           pan_url?: string | null
@@ -70,6 +72,8 @@ export type Database = {
           user_id?: string | null
           name?: string
           contact?: string
+          aadhaar_number?: string | null // Added
+          pan_number?: string | null     // Added
           photo_url?: string | null
           aadhaar_url?: string | null
           pan_url?: string | null
@@ -91,8 +95,8 @@ export type Database = {
           user_id: string | null
           labor_id: string
           labor_name: string | null
-          date: string // date string
-          status: string // 'present' | 'absent'
+          date: string 
+          status: string 
           work_details: string | null
           advance_amount: number | null
           created_at: string
@@ -142,10 +146,11 @@ export type Database = {
   }
 }
 
-// Helper type for form data which might still use File objects before upload
 export interface LaborProfileFormDataWithFiles extends Omit<LaborProfile, 'id' | 'created_at' | 'photo_url' | 'aadhaar_url' | 'pan_url' | 'driving_license_url'> {
+  aadhaarNumber?: string; // Added from schema (text input)
+  panNumber?: string;     // Added from schema (text input)
   photo?: File;
-  aadhaar?: File;
-  pan?: File;
+  aadhaar?: File; // This is for Aadhaar document upload
+  pan?: File;     // This is for PAN document upload
   drivingLicense?: File;
 }

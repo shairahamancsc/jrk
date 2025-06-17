@@ -7,7 +7,7 @@ import { useData } from '@/contexts/data-context';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { FileText, UserCircle2, Users, Loader2 } from 'lucide-react';
+import { FileText, UserCircle2, Users, Loader2, Fingerprint, ScanLine } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import Image from 'next/image';
 
@@ -16,8 +16,6 @@ export default function LaborPage() {
   const [clientLoading, setClientLoading] = useState(true);
 
   useEffect(() => {
-    // This effect handles the initial perceived loading state on the client
-    // It waits for the DataProvider's loading to finish.
     if (!dataLoading) {
       setClientLoading(false);
     }
@@ -26,10 +24,8 @@ export default function LaborPage() {
   const getFileDisplay = (fileUrl?: string) => {
     if (!fileUrl) return <span className="text-muted-foreground text-xs">Not Provided</span>;
     
-    // Check if it's a placeholder or an actual URL (likely from Supabase Storage)
     if (fileUrl.startsWith('https://placehold.co') || fileUrl.startsWith('http')) {
-      // For actual Supabase URLs, you might want to show a generic icon or a link
-      const fileName = fileUrl.substring(fileUrl.lastIndexOf('/') + 1).split('?')[0]; // Basic file name extraction
+      const fileName = fileUrl.substring(fileUrl.lastIndexOf('/') + 1).split('?')[0];
       return (
         <a 
           href={fileUrl} 
@@ -42,19 +38,18 @@ export default function LaborPage() {
         </a>
       );
     }
-    // Fallback for unexpected string format
     return <span className="text-xs flex items-center gap-1"><FileText size={14} /> {fileUrl}</span>;
   };
 
   const getAvatarSrc = (photoUrl?: string): string => {
     if (!photoUrl) return '';
-    if (photoUrl.startsWith('http') || photoUrl.startsWith('data:image')) { // Handles Supabase URLs & placeholders
+    if (photoUrl.startsWith('http') || photoUrl.startsWith('data:image')) { 
       return photoUrl;
     }
-    return ''; // Fallback if not a URL
+    return ''; 
   }
   
-  if (clientLoading || dataLoading) { // Keep showing loader if either client is initializing or data is loading
+  if (clientLoading || dataLoading) { 
     return (
       <div className="flex h-[calc(100vh-theme(spacing.14)-2*theme(spacing.4))] items-center justify-center">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -86,9 +81,11 @@ export default function LaborPage() {
                     <TableHead>Photo</TableHead>
                     <TableHead>Name</TableHead>
                     <TableHead>Contact</TableHead>
-                    <TableHead>Aadhaar</TableHead>
-                    <TableHead>PAN</TableHead>
-                    <TableHead>License</TableHead>
+                    <TableHead className="whitespace-nowrap">Aadhaar No.</TableHead>
+                    <TableHead className="whitespace-nowrap">PAN No.</TableHead>
+                    <TableHead>Aadhaar Doc</TableHead>
+                    <TableHead>PAN Doc</TableHead>
+                    <TableHead>License Doc</TableHead>
                     <TableHead>Added On</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -109,6 +106,8 @@ export default function LaborPage() {
                       </TableCell>
                       <TableCell className="font-medium">{profile.name}</TableCell>
                       <TableCell>{profile.contact}</TableCell>
+                      <TableCell>{profile.aadhaar_number || <span className="text-muted-foreground text-xs">N/A</span>}</TableCell>
+                      <TableCell>{profile.pan_number || <span className="text-muted-foreground text-xs">N/A</span>}</TableCell>
                       <TableCell>{getFileDisplay(profile.aadhaar_url)}</TableCell>
                       <TableCell>{getFileDisplay(profile.pan_url)}</TableCell>
                       <TableCell>{getFileDisplay(profile.driving_license_url)}</TableCell>
