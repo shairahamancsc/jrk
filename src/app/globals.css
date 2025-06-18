@@ -2,9 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  font-family: 'Roboto', Arial, Helvetica, sans-serif;
-}
+/* Removed direct body font-family, now handled by next/font and Tailwind */
 
 @layer base {
   :root {
