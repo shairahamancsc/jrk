@@ -8,7 +8,8 @@ import {
   Users,
   CalendarCheck,
   LogOut,
-  UserPlus, // Added for Add Supervisor
+  UserPlus, 
+  Banknote, // Added for Payment Reports
 } from 'lucide-react';
 import {
   SidebarMenu,
@@ -22,6 +23,7 @@ const navItemsBase = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/labor', label: 'Labor Profiles', icon: Users },
   { href: '/attendance', label: 'Daily Attendance', icon: CalendarCheck },
+  { href: '/payment-reports', label: 'Payment Reports', icon: Banknote }, // New item
 ];
 
 const adminNavItems = [

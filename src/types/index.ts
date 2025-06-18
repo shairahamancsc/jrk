@@ -7,7 +7,7 @@ export interface LaborProfile {
   contact: string;
   aadhaar_number?: string;
   pan_number?: string;
-  daily_salary?: number; // New field for daily salary
+  daily_salary?: number; 
   photo_url?: string; 
   aadhaar_url?: string; 
   pan_url?: string; 
@@ -30,6 +30,16 @@ export interface AttendanceEntry {
   user_id?: string; 
 }
 
+export interface PaymentReportEntry {
+  laborId: string;
+  laborName: string;
+  dailySalary: number; // Will default to 0 if not set on profile
+  presentDays: number;
+  totalEarnings: number;
+  totalAdvance: number;
+  netPayment: number;
+}
+
 export type Json =
   | string
   | number
@@ -49,7 +59,7 @@ export type Database = {
           contact: string
           aadhaar_number: string | null
           pan_number: string | null
-          daily_salary: number | null // Added daily_salary
+          daily_salary: number | null 
           photo_url: string | null
           aadhaar_url: string | null
           pan_url: string | null
@@ -63,7 +73,7 @@ export type Database = {
           contact: string
           aadhaar_number?: string | null
           pan_number?: string | null
-          daily_salary?: number | null // Added daily_salary
+          daily_salary?: number | null 
           photo_url?: string | null
           aadhaar_url?: string | null
           pan_url?: string | null
@@ -77,7 +87,7 @@ export type Database = {
           contact?: string
           aadhaar_number?: string | null
           pan_number?: string | null
-          daily_salary?: number | null // Added daily_salary
+          daily_salary?: number | null 
           photo_url?: string | null
           aadhaar_url?: string | null
           pan_url?: string | null
@@ -153,7 +163,7 @@ export type Database = {
 export interface LaborProfileFormDataWithFiles extends Omit<LaborProfile, 'id' | 'created_at' | 'photo_url' | 'aadhaar_url' | 'pan_url' | 'driving_license_url' | 'daily_salary'> {
   aadhaarNumber?: string;
   panNumber?: string;
-  dailySalary?: number; // Added dailySalary
+  dailySalary?: number; 
   photo?: File;
   aadhaar?: File;
   pan?: File;
