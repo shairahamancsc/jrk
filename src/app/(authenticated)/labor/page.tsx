@@ -122,10 +122,12 @@ export default function LaborPage() {
 
   const handleEditModalCancel = useCallback(() => {
     setIsEditModalOpen(false);
+    // setSelectedProfile(null); // Consider if you want to clear selection on cancel
   }, []);
 
   const handleEditModalSubmitSuccess = useCallback(() => {
     setIsEditModalOpen(false);
+    // setSelectedProfile(null); // Consider if you want to clear selection on success
   }, []);
   
   if (clientLoading || dataLoading) { 
@@ -261,7 +263,7 @@ export default function LaborPage() {
 
       {selectedProfile && (
         <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
-          <DialogContent className="w-[95vw] max-w-xs sm:max-w-lg rounded-lg">
+          <DialogContent key={selectedProfile.id} className="w-[95vw] max-w-xs sm:max-w-lg rounded-lg">
             <div className={cn("flex flex-col space-y-1.5 text-center sm:text-left")}>
               <DialogTitle>Edit Profile: {selectedProfile.name}</DialogTitle>
                <DialogDescription>
@@ -307,5 +309,7 @@ export default function LaborPage() {
     </div>
   );
 }
+
+    
 
     
