@@ -86,6 +86,8 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     
     if (error) {
         console.error(`[DataProvider] Error fetching labor profile by ID ${profileId}:`, error);
+        // PGRST116 means no rows found, which is a valid outcome for .single() if the ID is wrong or RLS prevents access.
+        // Only toast for other unexpected errors.
         if (error.code !== 'PGRST116') { 
              toast({ variant: "destructive", title: "Fetch Error", description: `Could not fetch profile: ${error.message}` });
         }
@@ -336,50 +338,33 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     
     const finalUpdateObject: Partial<Database['public']['Tables']['labor_profiles']['Update']> = {};
 
-    // Name (required string)
     if (profileData.name !== undefined && profileData.name !== existingProfile.name) {
       finalUpdateObject.name = profileData.name;
     }
-    // Contact (required string)
     if (profileData.contact !== undefined && profileData.contact !== existingProfile.contact) {
       finalUpdateObject.contact = profileData.contact;
     }
-
-    // AadhaarNumber (optional string, nullable in DB)
-    // profileData.aadhaarNumber from Zod is string | undefined
     if (profileData.aadhaarNumber !== undefined) { 
       if (profileData.aadhaarNumber !== existingProfile.aadhaar_number) {
         finalUpdateObject.aadhaar_number = profileData.aadhaarNumber;
       }
-    } else { // User cleared the field (profileData.aadhaarNumber is undefined)
-      if (existingProfile.aadhaar_number !== null) { 
+    } else if (profileData.hasOwnProperty('aadhaarNumber') && existingProfile.aadhaar_number !== null) { 
         finalUpdateObject.aadhaar_number = null; 
-      }
     }
-
-    // PanNumber (optional string, nullable in DB)
-    // profileData.panNumber from Zod is string | undefined
     if (profileData.panNumber !== undefined) {
       const upperPan = profileData.panNumber.toUpperCase();
       if (upperPan !== existingProfile.pan_number) {
         finalUpdateObject.pan_number = upperPan;
       }
-    } else { 
-      if (existingProfile.pan_number !== null) {
+    } else if (profileData.hasOwnProperty('panNumber') && existingProfile.pan_number !== null) {
         finalUpdateObject.pan_number = null;
-      }
     }
-
-    // DailySalary (optional number, nullable in DB)
-    // profileData.dailySalary from Zod is number | undefined
     if (profileData.dailySalary !== undefined) {
       if (profileData.dailySalary !== existingProfile.daily_salary) {
         finalUpdateObject.daily_salary = profileData.dailySalary;
       }
-    } else { 
-      if (existingProfile.daily_salary !== null) {
+    } else if (profileData.hasOwnProperty('dailySalary') && existingProfile.daily_salary !== null) { 
         finalUpdateObject.daily_salary = null;
-      }
     }
 
     let filesWereUpdated = false;
@@ -410,20 +395,18 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
-    const { data, error } = await supabase
+    const { error: updateError } = await supabase
       .from('labor_profiles')
       .update(finalUpdateObject)
       .eq('id', profileId)
-      .eq('user_id', user.id)
-      .select()
-      .single();
+      .eq('user_id', user.id);
 
-    if (error) {
-      console.error('[DataProvider] Error updating labor profile:', error);
-      toast({ variant: "destructive", title: "Update Failed", description: `Could not update profile: ${error.message}` });
-    } else if (data) {
+    if (updateError) {
+      console.error('[DataProvider] Error updating labor profile:', updateError);
+      toast({ variant: "destructive", title: "Update Failed", description: `Could not update profile: ${updateError.message}` });
+    } else {
       await fetchLaborProfiles(); 
-      toast({ title: "Success", description: `Profile for ${data.name} updated.` });
+      toast({ title: "Success", description: `Profile for ${profileData.name || existingProfile.name} updated.` });
     }
     setIsLoading(false);
   };
@@ -526,3 +509,5 @@ export const useData = () => {
   return context;
 };
 
+
+    
