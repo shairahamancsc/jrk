@@ -125,7 +125,7 @@ export function LaborProfileForm({
         <Input 
           type="file" 
           accept="image/*,application/pdf"
-          className="file:text-primary file:font-semibold file:mr-2 file:border-0 file:bg-accent file:text-accent-foreground file:rounded-md file:px-2 file:py-1 hover:file:bg-accent/80"
+          className="file:text-primary file:font-semibold file:mr-2 file:border-0 file:bg-accent file:text-accent-foreground file:rounded-md file:px-2 file:py-1 hover:file:bg-accent/80 text-xs"
           {...form.register(fieldName)} 
           disabled={isSubmitting}
         />
@@ -165,10 +165,10 @@ export function LaborProfileForm({
             name="photo"
             render={({ field }) => (
               <FormItem className="flex flex-col items-center space-y-3">
-                <Avatar className="h-32 w-32 border-2 border-muted-foreground/50">
+                <Avatar className="h-24 w-24 sm:h-28 md:h-32 border-2 border-muted-foreground/50">
                   <AvatarImage src={photoPreviewUrl || existingProfile?.photo_url || ''} alt="Profile Photo Preview" data-ai-hint="profile person" />
                   <AvatarFallback>
-                    <UserCircle2 className="h-20 w-20 text-muted-foreground" />
+                    <UserCircle2 className="h-16 w-16 sm:h-20 md:h-24 text-muted-foreground" />
                   </AvatarFallback>
                 </Avatar>
                 <FormControl>
@@ -208,7 +208,7 @@ export function LaborProfileForm({
             )}
           />
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
             <FormField
               control={form.control}
               name="name"
@@ -302,7 +302,7 @@ export function LaborProfileForm({
 
           <h3 className="text-lg font-semibold text-primary pt-4 border-t mt-6">Upload Documents (Optional)</h3>
           <p className="text-sm text-muted-foreground -mt-4 mb-4">These are for document copies (images/PDFs). The numbers are entered above.</p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
             <GenericFileInput fieldName="aadhaar" label="Aadhaar Card Document" currentFileUrl={existingProfile?.aadhaar_url} />
             <GenericFileInput fieldName="pan" label="PAN Card Document" currentFileUrl={existingProfile?.pan_url}/>
             <GenericFileInput fieldName="drivingLicense" label="Driving License Document" currentFileUrl={existingProfile?.driving_license_url} />
