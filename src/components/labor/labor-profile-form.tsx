@@ -21,12 +21,12 @@ interface LaborProfileFormProps {
   onSubmitSuccess?: () => void; 
 }
 
-export function LaborProfileForm({ 
+const LaborProfileFormComponent = ({ 
   existingProfile, 
   mode = 'add', 
   onCancel,
   onSubmitSuccess 
-}: LaborProfileFormProps) {
+}: LaborProfileFormProps) => {
   const { addLaborProfile, updateLaborProfile } = useData();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
@@ -340,3 +340,6 @@ export function LaborProfileForm({
   );
 }
 
+export const LaborProfileForm = React.memo(LaborProfileFormComponent);
+
+    

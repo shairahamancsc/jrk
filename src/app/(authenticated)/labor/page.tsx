@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { LaborProfileForm } from '@/components/labor/labor-profile-form';
 import { useData } from '@/contexts/data-context';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
@@ -119,6 +119,14 @@ export default function LaborPage() {
       setIsDeleting(false);
     }
   };
+
+  const handleEditModalCancel = useCallback(() => {
+    setIsEditModalOpen(false);
+  }, []);
+
+  const handleEditModalSubmitSuccess = useCallback(() => {
+    setIsEditModalOpen(false);
+  }, []);
   
   if (clientLoading || dataLoading) { 
     return (
@@ -264,8 +272,8 @@ export default function LaborPage() {
               <LaborProfileForm 
                 existingProfile={selectedProfile} 
                 mode="edit" 
-                onCancel={() => setIsEditModalOpen(false)}
-                onSubmitSuccess={() => setIsEditModalOpen(false)}
+                onCancel={handleEditModalCancel}
+                onSubmitSuccess={handleEditModalSubmitSuccess}
               />
             </div>
           </DialogContent>
@@ -299,3 +307,5 @@ export default function LaborPage() {
     </div>
   );
 }
+
+    
