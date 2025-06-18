@@ -47,7 +47,7 @@ export function LaborProfileForm({
   });
 
   useEffect(() => {
-    if (existingProfile && mode === 'edit') {
+    if (mode === 'edit' && existingProfile) {
       form.reset({
         name: existingProfile.name,
         contact: existingProfile.contact,
@@ -74,7 +74,7 @@ export function LaborProfileForm({
       });
       setPhotoPreviewUrl(null);
     }
-  }, [existingProfile, mode, form]);
+  }, [existingProfile?.id, mode, form]);
 
 
   const onSubmit = async (data: LaborProfileFormData) => {
@@ -158,17 +158,17 @@ export function LaborProfileForm({
   return (
     <FormWrapper>
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 md:space-y-6">
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3 md:space-y-4">
           
           <FormField
             control={form.control}
             name="photo"
             render={({ field }) => (
-              <FormItem className="flex flex-col items-center space-y-3">
-                <Avatar className="h-20 w-20 sm:h-24 md:h-28 border-2 border-muted-foreground/50">
+              <FormItem className="flex flex-col items-center space-y-2">
+                <Avatar className="h-16 w-16 sm:h-20 md:h-24 border-2 border-muted-foreground/50">
                   <AvatarImage src={photoPreviewUrl || existingProfile?.photo_url || ''} alt="Profile Photo Preview" data-ai-hint="profile person" />
                   <AvatarFallback>
-                    <UserCircle2 className="h-12 w-12 sm:h-16 md:h-20 text-muted-foreground" />
+                    <UserCircle2 className="h-10 w-10 sm:h-12 md:h-16 text-muted-foreground" />
                   </AvatarFallback>
                 </Avatar>
                 <FormControl>
@@ -196,9 +196,9 @@ export function LaborProfileForm({
                     />
                     <FormLabel
                       htmlFor="photo-upload"
-                      className="cursor-pointer inline-flex items-center gap-2 text-sm font-medium text-primary hover:text-primary/80"
+                      className="cursor-pointer inline-flex items-center gap-1 text-xs sm:text-sm font-medium text-primary hover:text-primary/80"
                     >
-                      <FilePlus2 size={18} />
+                      <FilePlus2 size={16} />
                       Upload Photo
                     </FormLabel>
                   </div>
@@ -208,17 +208,17 @@ export function LaborProfileForm({
             )}
           />
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 md:gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 sm:gap-3 md:gap-4">
             <FormField
               control={form.control}
               name="name"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-foreground">Full Name</FormLabel>
+                  <FormLabel className="text-foreground text-xs sm:text-sm">Full Name</FormLabel>
                   <FormControl>
-                    <Input placeholder="Enter full name" {...field} disabled={isSubmitting} />
+                    <Input placeholder="Enter full name" {...field} disabled={isSubmitting} className="text-xs sm:text-sm"/>
                   </FormControl>
-                  <FormMessage />
+                  <FormMessage className="text-xs"/>
                 </FormItem>
               )}
             />
@@ -227,11 +227,11 @@ export function LaborProfileForm({
               name="contact"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-foreground">Contact Number</FormLabel>
+                  <FormLabel className="text-foreground text-xs sm:text-sm">Contact Number</FormLabel>
                   <FormControl>
-                    <Input placeholder="Enter contact number" {...field} disabled={isSubmitting} />
+                    <Input placeholder="Enter contact number" {...field} disabled={isSubmitting} className="text-xs sm:text-sm"/>
                   </FormControl>
-                  <FormMessage />
+                  <FormMessage className="text-xs"/>
                 </FormItem>
               )}
             />
@@ -240,13 +240,13 @@ export function LaborProfileForm({
               name="aadhaarNumber"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="flex items-center gap-2 text-foreground">
-                    <Fingerprint size={16}/> Aadhaar Number (Optional)
+                  <FormLabel className="flex items-center gap-1 text-foreground text-xs sm:text-sm">
+                    <Fingerprint size={14}/> Aadhaar Number (Optional)
                   </FormLabel>
                   <FormControl>
-                    <Input placeholder="Enter 12-digit Aadhaar number" {...field} disabled={isSubmitting} maxLength={12}/>
+                    <Input placeholder="Enter 12-digit Aadhaar number" {...field} disabled={isSubmitting} maxLength={12} className="text-xs sm:text-sm"/>
                   </FormControl>
-                  <FormMessage />
+                  <FormMessage className="text-xs"/>
                 </FormItem>
               )}
             />
@@ -255,8 +255,8 @@ export function LaborProfileForm({
               name="panNumber"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="flex items-center gap-2 text-foreground">
-                   <ScanLine size={16}/> PAN Number (Optional)
+                  <FormLabel className="flex items-center gap-1 text-foreground text-xs sm:text-sm">
+                   <ScanLine size={14}/> PAN Number (Optional)
                   </FormLabel>
                   <FormControl>
                     <Input 
@@ -265,9 +265,10 @@ export function LaborProfileForm({
                       disabled={isSubmitting} 
                       maxLength={10}
                       onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                      className="text-xs sm:text-sm"
                     />
                   </FormControl>
-                  <FormMessage />
+                  <FormMessage className="text-xs"/>
                 </FormItem>
               )}
             />
@@ -276,8 +277,8 @@ export function LaborProfileForm({
               name="dailySalary"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="flex items-center gap-2 text-foreground">
-                    <WalletCards size={16} /> Daily Salary (₹) (Optional)
+                  <FormLabel className="flex items-center gap-1 text-foreground text-xs sm:text-sm">
+                    <WalletCards size={14} /> Daily Salary (₹) (Optional)
                   </FormLabel>
                   <FormControl>
                     <Input 
@@ -292,26 +293,27 @@ export function LaborProfileForm({
                       disabled={isSubmitting} 
                       step="0.01"
                       min="0"
+                      className="text-xs sm:text-sm"
                     />
                   </FormControl>
-                  <FormMessage />
+                  <FormMessage className="text-xs"/>
                 </FormItem>
               )}
             />
           </div>
 
-          <h3 className="text-lg font-semibold text-primary pt-4 border-t mt-6">Upload Documents (Optional)</h3>
-          <p className="text-sm text-muted-foreground -mt-4 mb-4">These are for document copies (images/PDFs). The numbers are entered above.</p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 md:gap-6">
+          <h3 className="text-base sm:text-lg font-semibold text-primary pt-3 border-t mt-4">Upload Documents (Optional)</h3>
+          <p className="text-xs sm:text-sm text-muted-foreground -mt-3 mb-3">These are for document copies (images/PDFs). The numbers are entered above.</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 sm:gap-3 md:gap-4">
             <GenericFileInput fieldName="aadhaar" label="Aadhaar Card Document" currentFileUrl={existingProfile?.aadhaar_url} />
             <GenericFileInput fieldName="pan" label="PAN Card Document" currentFileUrl={existingProfile?.pan_url}/>
             <GenericFileInput fieldName="drivingLicense" label="Driving License Document" currentFileUrl={existingProfile?.driving_license_url} />
           </div>
           
-          <div className="flex flex-col md:flex-row gap-2 pt-4">
+          <div className="flex flex-col md:flex-row gap-2 pt-3">
             <Button 
               type="submit" 
-              className="bg-primary hover:bg-primary/90 text-base py-3 px-6 w-full md:w-auto"
+              className="bg-primary hover:bg-primary/90 text-sm sm:text-base py-2.5 px-4 sm:py-3 sm:px-6 w-full md:w-auto"
               disabled={isSubmitting}
             >
               {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -325,7 +327,7 @@ export function LaborProfileForm({
                   setPhotoPreviewUrl(existingProfile?.photo_url || null); 
                   onCancel();
                 }}
-                className="text-base py-3 px-6 w-full md:w-auto"
+                className="text-sm sm:text-base py-2.5 px-4 sm:py-3 sm:px-6 w-full md:w-auto"
                 disabled={isSubmitting}
               >
                 Cancel
@@ -337,3 +339,4 @@ export function LaborProfileForm({
     </FormWrapper>
   );
 }
+
