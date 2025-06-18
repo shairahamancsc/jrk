@@ -170,7 +170,7 @@ export default function PaymentReportsPage() {
     <div className="space-y-6 sm:space-y-8">
       <header className="space-y-1 sm:space-y-2">
         <h1 className="text-2xl sm:text-3xl font-headline font-bold text-primary flex items-center gap-2">
-          <Calculator size={28} sm:size={32} /> Payment Reports
+          <Calculator className="h-7 w-7 sm:h-8 sm:w-8" /> Payment Reports
         </h1>
         <p className="text-sm sm:text-base text-muted-foreground">
           Generate payment reports and record payments for labor based on attendance and advances.
@@ -243,7 +243,7 @@ export default function PaymentReportsPage() {
           </Button>
           {calculationError && (
             <div className="flex items-center gap-2 text-destructive p-2 sm:p-3 bg-destructive/10 rounded-md">
-              <AlertTriangle size={16} sm:size={18} />
+              <AlertTriangle className="h-4 w-4 sm:h-[18px] sm:w-[18px]" />
               <p className="text-xs sm:text-sm font-medium">{calculationError}</p>
             </div>
           )}
