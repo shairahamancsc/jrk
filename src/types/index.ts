@@ -33,12 +33,26 @@ export interface AttendanceEntry {
 export interface PaymentReportEntry {
   laborId: string;
   laborName: string;
-  dailySalary: number; // Will default to 0 if not set on profile
+  dailySalary: number; 
   presentDays: number;
   totalEarnings: number;
   totalAdvance: number;
   netPayment: number;
 }
+
+export interface PaymentHistoryEntry {
+  id: string;
+  user_id: string;
+  labor_id: string;
+  labor_name?: string;
+  payment_date: string; 
+  period_start_date: string;
+  period_end_date: string;
+  amount_paid: number;
+  notes?: string;
+  created_at: string;
+}
+
 
 export type Json =
   | string
@@ -148,6 +162,58 @@ export type Database = {
             foreignKeyName: "attendance_entries_user_id_fkey"
             columns: ["user_id"]
             referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      payment_history: {
+        Row: {
+          id: string
+          user_id: string
+          labor_id: string
+          labor_name: string | null
+          payment_date: string 
+          period_start_date: string
+          period_end_date: string
+          amount_paid: number
+          notes: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          labor_id: string
+          labor_name?: string | null
+          payment_date: string
+          period_start_date: string
+          period_end_date: string
+          amount_paid: number
+          notes?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          labor_id?: string
+          labor_name?: string | null
+          payment_date?: string
+          period_start_date?: string
+          period_end_date?: string
+          amount_paid?: number
+          notes?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_history_user_id_fkey"
+            columns: ["user_id"]
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_history_labor_id_fkey"
+            columns: ["labor_id"]
+            referencedRelation: "labor_profiles"
             referencedColumns: ["id"]
           }
         ]

@@ -4,18 +4,22 @@
 import type { ReactNode } from 'react';
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase/client';
-import type { LaborProfile, AttendanceEntry, LaborProfileFormDataWithFiles, Database } from '@/types';
+import type { LaborProfile, AttendanceEntry, LaborProfileFormDataWithFiles, Database, PaymentHistoryEntry } from '@/types';
 import { useAuth } from './auth-context'; 
 import { useToast } from "@/hooks/use-toast";
+import { formatISO } from 'date-fns';
 
 interface DataContextType {
   laborProfiles: LaborProfile[];
   attendanceEntries: AttendanceEntry[];
+  paymentHistory: PaymentHistoryEntry[]; // Added
   addLaborProfile: (profileData: LaborProfileFormDataWithFiles) => Promise<void>;
   addAttendanceEntry: (entryData: Omit<AttendanceEntry, 'id' | 'created_at' | 'user_id'>) => Promise<void>;
   deleteLaborProfile: (profileId: string) => Promise<void>;
   updateLaborProfile: (profileId: string, profileData: Partial<LaborProfileFormDataWithFiles>) => Promise<void>; 
   fetchLaborProfileById: (profileId: string) => Promise<LaborProfile | null>;
+  addPaymentHistoryEntry: (paymentData: Omit<PaymentHistoryEntry, 'id' | 'created_at' | 'user_id'>) => Promise<void>; // Added
+  fetchPaymentHistory: () => Promise<void>; // Added
   isLoading: boolean;
 }
 
@@ -41,6 +45,7 @@ const getPathFromUrl = (url: string): string | null => {
 export const DataProvider = ({ children }: { children: ReactNode }) => {
   const [laborProfiles, setLaborProfiles] = useState<LaborProfile[]>([]);
   const [attendanceEntries, setAttendanceEntries] = useState<AttendanceEntry[]>([]);
+  const [paymentHistory, setPaymentHistory] = useState<PaymentHistoryEntry[]>([]); // Added
   const [isLoading, setIsLoading] = useState(true);
   const { user } = useAuth();
   const { toast } = useToast();
@@ -106,6 +111,27 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       setAttendanceEntries(data || []);
     }
   };
+  
+  const fetchPaymentHistory = async () => {
+    if (!user?.id) {
+      setPaymentHistory([]);
+      return;
+    }
+    const { data, error } = await supabase
+      .from('payment_history')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('payment_date', { ascending: false });
+
+    if (error) {
+      console.error('[DataProvider] Error fetching payment history:', error);
+      toast({ variant: "destructive", title: "Fetch Error", description: "Could not fetch payment history." });
+      setPaymentHistory([]);
+    } else {
+      setPaymentHistory(data || []);
+    }
+  };
+
 
   useEffect(() => {
     const loadData = async () => {
@@ -113,9 +139,11 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       if (user?.id) {
         await fetchLaborProfiles();
         await fetchAttendanceEntries();
+        await fetchPaymentHistory(); // Added
       } else {
         setLaborProfiles([]);
         setAttendanceEntries([]);
+        setPaymentHistory([]); // Added
       }
       setIsLoading(false);
     };
@@ -180,7 +208,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       contact: profileFormData.contact,
       aadhaar_number: profileFormData.aadhaarNumber,
       pan_number: profileFormData.panNumber,
-      daily_salary: profileFormData.dailySalary, // Added daily_salary
+      daily_salary: profileFormData.dailySalary, 
       photo_url,
       aadhaar_url,
       pan_url,
@@ -275,40 +303,19 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         return;
     }
     setIsLoading(true);
-    // Placeholder for full implementation:
-    // This will need to handle file uploads/deletions similarly to addLaborProfile
-    // and then update the database record.
     
-    // For now, construct the update object based on what might be provided
     const updateObject: Partial<Database['public']['Tables']['labor_profiles']['Update']> = {
       name: profileData.name,
       contact: profileData.contact,
       aadhaar_number: profileData.aadhaarNumber,
       pan_number: profileData.panNumber,
-      daily_salary: profileData.dailySalary, // Added daily_salary
-      // File URLs would need to be handled here after uploading new files and deleting old ones if necessary
+      daily_salary: profileData.dailySalary, 
     };
 
-    // Remove undefined fields from updateObject to prevent overwriting existing values with nulls
     Object.keys(updateObject).forEach(key => updateObject[key as keyof typeof updateObject] === undefined && delete updateObject[key as keyof typeof updateObject]);
 
-
     console.log('[DataProvider] Placeholder: updateLaborProfile called for ID:', profileId, 'with data:', profileData, 'updateObject:', updateObject);
-    // Actual update logic:
-    // const { data, error } = await supabase
-    //   .from('labor_profiles')
-    //   .update(updateObject) // This needs to be the Supabase Update type
-    //   .eq('id', profileId)
-    //   .eq('user_id', user.id)
-    //   .select()
-    //   .single();
-
-    // if (error) {
-    //   toast({ variant: "destructive", title: "Update Error", description: `Could not update profile: ${error.message}` });
-    // } else if (data) {
-    //   toast({ title: "Success", description: "Profile updated." });
-    //   await fetchLaborProfiles();
-    // }
+    
     await new Promise(resolve => setTimeout(resolve, 1000)); 
     toast({ title: "In Progress", description: "Update functionality is under development." });
     await fetchLaborProfiles(); 
@@ -351,15 +358,53 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     setIsLoading(false);
   };
 
+  const addPaymentHistoryEntry = async (paymentData: Omit<PaymentHistoryEntry, 'id' | 'created_at' | 'user_id'>) => {
+    if (!user?.id) {
+      toast({ variant: "destructive", title: "Auth Error", description: "User not authenticated to record payment." });
+      return;
+    }
+    setIsLoading(true);
+
+    const entryToInsert: Database['public']['Tables']['payment_history']['Insert'] = {
+      user_id: user.id,
+      labor_id: paymentData.labor_id,
+      labor_name: paymentData.labor_name,
+      payment_date: formatISO(new Date(paymentData.payment_date), { representation: 'date' }),
+      period_start_date: formatISO(new Date(paymentData.period_start_date), { representation: 'date' }),
+      period_end_date: formatISO(new Date(paymentData.period_end_date), { representation: 'date' }),
+      amount_paid: paymentData.amount_paid,
+      notes: paymentData.notes,
+    };
+
+    const { data, error } = await supabase
+      .from('payment_history')
+      .insert(entryToInsert)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('[DataProvider] Error adding payment history entry:', error);
+      toast({ variant: "destructive", title: "Database Error", description: `Could not record payment: ${error.message}` });
+    } else if (data) {
+      await fetchPaymentHistory();
+      toast({ title: "Success", description: "Payment recorded successfully." });
+    }
+    setIsLoading(false);
+  };
+
+
   return (
     <DataContext.Provider value={{ 
         laborProfiles, 
         attendanceEntries, 
+        paymentHistory, // Added
         addLaborProfile, 
         addAttendanceEntry, 
         deleteLaborProfile,
         updateLaborProfile, 
         fetchLaborProfileById,
+        addPaymentHistoryEntry, // Added
+        fetchPaymentHistory, // Added
         isLoading 
     }}>
       {children}
