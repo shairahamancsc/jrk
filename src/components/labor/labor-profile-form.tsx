@@ -168,7 +168,7 @@ export function LaborProfileForm({
                   </AvatarFallback>
                 </Avatar>
                 <FormControl>
-                  <>
+                  <div>
                     <Input
                       id="photo-upload"
                       type="file"
@@ -197,7 +197,7 @@ export function LaborProfileForm({
                       <FilePlus2 size={18} />
                       Upload Photo
                     </FormLabel>
-                  </>
+                  </div>
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -306,3 +306,4 @@ export function LaborProfileForm({
     </FormWrapper>
   );
 }
+
