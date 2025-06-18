@@ -12,14 +12,14 @@ import { formatISO } from 'date-fns';
 interface DataContextType {
   laborProfiles: LaborProfile[];
   attendanceEntries: AttendanceEntry[];
-  paymentHistory: PaymentHistoryEntry[]; // Added
+  paymentHistory: PaymentHistoryEntry[];
   addLaborProfile: (profileData: LaborProfileFormDataWithFiles) => Promise<void>;
   addAttendanceEntry: (entryData: Omit<AttendanceEntry, 'id' | 'created_at' | 'user_id'>) => Promise<void>;
   deleteLaborProfile: (profileId: string) => Promise<void>;
   updateLaborProfile: (profileId: string, profileData: Partial<LaborProfileFormDataWithFiles>) => Promise<void>; 
   fetchLaborProfileById: (profileId: string) => Promise<LaborProfile | null>;
-  addPaymentHistoryEntry: (paymentData: Omit<PaymentHistoryEntry, 'id' | 'created_at' | 'user_id'>) => Promise<void>; // Added
-  fetchPaymentHistory: () => Promise<void>; // Added
+  addPaymentHistoryEntry: (paymentData: Omit<PaymentHistoryEntry, 'id' | 'created_at' | 'user_id'>) => Promise<void>;
+  fetchPaymentHistory: () => Promise<void>;
   isLoading: boolean;
 }
 
@@ -30,8 +30,6 @@ const STORAGE_BUCKET_NAME = 'profile-documents';
 const getPathFromUrl = (url: string): string | null => {
   try {
     const urlObject = new URL(url);
-    // Example URL: https://<project-ref>.supabase.co/storage/v1/object/public/profile-documents/public/user_id/profile_name_timestamp_filename.ext
-    // We want to extract: public/user_id/profile_name_timestamp_filename.ext
     const pathSegments = urlObject.pathname.split('/');
     const bucketNameIndex = pathSegments.indexOf(STORAGE_BUCKET_NAME);
     if (bucketNameIndex !== -1 && bucketNameIndex + 1 < pathSegments.length) {
@@ -49,7 +47,7 @@ const getPathFromUrl = (url: string): string | null => {
 export const DataProvider = ({ children }: { children: ReactNode }) => {
   const [laborProfiles, setLaborProfiles] = useState<LaborProfile[]>([]);
   const [attendanceEntries, setAttendanceEntries] = useState<AttendanceEntry[]>([]);
-  const [paymentHistory, setPaymentHistory] = useState<PaymentHistoryEntry[]>([]); // Added
+  const [paymentHistory, setPaymentHistory] = useState<PaymentHistoryEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { user } = useAuth();
   const { toast } = useToast();
@@ -79,7 +77,6 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         toast({ variant: "destructive", title: "Auth Error", description: "User not authenticated." });
         return null;
     }
-    setIsLoading(true);
     const { data, error } = await supabase
         .from('labor_profiles')
         .select('*')
@@ -89,13 +86,11 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     
     if (error) {
         console.error(`[DataProvider] Error fetching labor profile by ID ${profileId}:`, error);
-        if (error.code !== 'PGRST116') { // PGRST116: "Searched for a single row, but found no rows" - not an error if profile doesn't exist for user
+        if (error.code !== 'PGRST116') { 
              toast({ variant: "destructive", title: "Fetch Error", description: `Could not fetch profile: ${error.message}` });
         }
-        setIsLoading(false);
         return null;
     }
-    setIsLoading(false);
     return data;
   };
 
@@ -147,11 +142,11 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       if (user?.id) {
         await fetchLaborProfiles();
         await fetchAttendanceEntries();
-        await fetchPaymentHistory(); // Added
+        await fetchPaymentHistory();
       } else {
         setLaborProfiles([]);
         setAttendanceEntries([]);
-        setPaymentHistory([]); // Added
+        setPaymentHistory([]);
       }
       setIsLoading(false);
     };
@@ -236,7 +231,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       name: profileFormData.name,
       contact: profileFormData.contact,
       aadhaar_number: profileFormData.aadhaarNumber,
-      pan_number: profileFormData.panNumber,
+      pan_number: profileFormData.panNumber ? profileFormData.panNumber.toUpperCase() : undefined,
       daily_salary: profileFormData.dailySalary, 
       photo_url,
       aadhaar_url,
@@ -320,7 +315,6 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
     } catch (error) {
         console.error('[DataProvider] Overall error in deleteLaborProfile:', error);
-        // Do not re-throw here if toast is already shown for specific errors
     } finally {
         setIsLoading(false);
     }
@@ -340,51 +334,87 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         return;
     }
     
-    const updateObject: Partial<Database['public']['Tables']['labor_profiles']['Update']> = {
-      name: profileData.name,
-      contact: profileData.contact,
-      aadhaar_number: profileData.aadhaarNumber,
-      pan_number: profileData.panNumber ? profileData.panNumber.toUpperCase() : undefined,
-      daily_salary: profileData.dailySalary, 
-    };
+    const finalUpdateObject: Partial<Database['public']['Tables']['labor_profiles']['Update']> = {};
 
-    // Handle file updates
+    // Name (required string)
+    if (profileData.name !== undefined && profileData.name !== existingProfile.name) {
+      finalUpdateObject.name = profileData.name;
+    }
+    // Contact (required string)
+    if (profileData.contact !== undefined && profileData.contact !== existingProfile.contact) {
+      finalUpdateObject.contact = profileData.contact;
+    }
+
+    // AadhaarNumber (optional string, nullable in DB)
+    // profileData.aadhaarNumber from Zod is string | undefined
+    if (profileData.aadhaarNumber !== undefined) { 
+      if (profileData.aadhaarNumber !== existingProfile.aadhaar_number) {
+        finalUpdateObject.aadhaar_number = profileData.aadhaarNumber;
+      }
+    } else { // User cleared the field (profileData.aadhaarNumber is undefined)
+      if (existingProfile.aadhaar_number !== null) { 
+        finalUpdateObject.aadhaar_number = null; 
+      }
+    }
+
+    // PanNumber (optional string, nullable in DB)
+    // profileData.panNumber from Zod is string | undefined
+    if (profileData.panNumber !== undefined) {
+      const upperPan = profileData.panNumber.toUpperCase();
+      if (upperPan !== existingProfile.pan_number) {
+        finalUpdateObject.pan_number = upperPan;
+      }
+    } else { 
+      if (existingProfile.pan_number !== null) {
+        finalUpdateObject.pan_number = null;
+      }
+    }
+
+    // DailySalary (optional number, nullable in DB)
+    // profileData.dailySalary from Zod is number | undefined
+    if (profileData.dailySalary !== undefined) {
+      if (profileData.dailySalary !== existingProfile.daily_salary) {
+        finalUpdateObject.daily_salary = profileData.dailySalary;
+      }
+    } else { 
+      if (existingProfile.daily_salary !== null) {
+        finalUpdateObject.daily_salary = null;
+      }
+    }
+
+    let filesWereUpdated = false;
     if (profileData.photo instanceof File) {
       await deleteFile(existingProfile.photo_url);
-      updateObject.photo_url = await uploadFile(profileData.photo, profileData.name || existingProfile.name);
+      finalUpdateObject.photo_url = await uploadFile(profileData.photo, profileData.name || existingProfile.name);
+      filesWereUpdated = true;
     }
     if (profileData.aadhaar instanceof File) {
       await deleteFile(existingProfile.aadhaar_url);
-      updateObject.aadhaar_url = await uploadFile(profileData.aadhaar, profileData.name || existingProfile.name);
+      finalUpdateObject.aadhaar_url = await uploadFile(profileData.aadhaar, profileData.name || existingProfile.name);
+      filesWereUpdated = true;
     }
     if (profileData.pan instanceof File) {
       await deleteFile(existingProfile.pan_url);
-      updateObject.pan_url = await uploadFile(profileData.pan, profileData.name || existingProfile.name);
+      finalUpdateObject.pan_url = await uploadFile(profileData.pan, profileData.name || existingProfile.name);
+      filesWereUpdated = true;
     }
     if (profileData.drivingLicense instanceof File) {
       await deleteFile(existingProfile.driving_license_url);
-      updateObject.driving_license_url = await uploadFile(profileData.drivingLicense, profileData.name || existingProfile.name);
+      finalUpdateObject.driving_license_url = await uploadFile(profileData.drivingLicense, profileData.name || existingProfile.name);
+      filesWereUpdated = true;
     }
     
-    // Remove undefined fields from updateObject to avoid overwriting with null
-    Object.keys(updateObject).forEach(key => {
-        const typedKey = key as keyof typeof updateObject;
-        if (updateObject[typedKey] === undefined) {
-            delete updateObject[typedKey];
-        }
-    });
-
-    if (Object.keys(updateObject).length === 0) {
-      toast({ title: "No Changes", description: "No new information was provided to update."});
+    if (Object.keys(finalUpdateObject).length === 0 && !filesWereUpdated) {
+      toast({ title: "No Changes", description: "No new information or files were provided to update."});
       setIsLoading(false);
       return;
     }
 
     const { data, error } = await supabase
       .from('labor_profiles')
-      .update(updateObject)
+      .update(finalUpdateObject)
       .eq('id', profileId)
-      .eq('user_id', user.id) // Ensure user can only update their own profiles
+      .eq('user_id', user.id)
       .select()
       .single();
 
@@ -392,7 +422,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       console.error('[DataProvider] Error updating labor profile:', error);
       toast({ variant: "destructive", title: "Update Failed", description: `Could not update profile: ${error.message}` });
     } else if (data) {
-      await fetchLaborProfiles(); // Refresh the list
+      await fetchLaborProfiles(); 
       toast({ title: "Success", description: `Profile for ${data.name} updated.` });
     }
     setIsLoading(false);
@@ -473,14 +503,14 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     <DataContext.Provider value={{ 
         laborProfiles, 
         attendanceEntries, 
-        paymentHistory, // Added
+        paymentHistory,
         addLaborProfile, 
         addAttendanceEntry, 
         deleteLaborProfile,
         updateLaborProfile, 
         fetchLaborProfileById,
-        addPaymentHistoryEntry, // Added
-        fetchPaymentHistory, // Added
+        addPaymentHistoryEntry,
+        fetchPaymentHistory,
         isLoading 
     }}>
       {children}
