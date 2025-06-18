@@ -21,8 +21,8 @@ import {
 import {
   Dialog,
   DialogContent,
-  DialogTitle, // Keep DialogTitle
-  DialogDescription, // Keep DialogDescription
+  DialogTitle, 
+  DialogDescription, 
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
@@ -33,7 +33,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { FileText, UserCircle2, Users, Loader2, MoreHorizontal, Eye, Edit3, Trash2 } from 'lucide-react';
+import { FileText, UserCircle2, Users, Loader2, MoreHorizontal, Eye, Edit3, Trash2, WalletCards } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import type { LaborProfile } from '@/types';
 import { useToast } from "@/hooks/use-toast";
@@ -86,6 +86,11 @@ export default function LaborPage() {
     return ''; 
   }
 
+  const formatCurrency = (amount?: number) => {
+    if (amount === undefined || amount === null) return <span className="text-muted-foreground text-xs">N/A</span>;
+    return `₹${amount.toFixed(2)}`;
+  };
+
   const handleOpenViewModal = (profile: LaborProfile) => {
     setSelectedProfile(profile);
     setIsViewModalOpen(true);
@@ -106,11 +111,9 @@ export default function LaborPage() {
     setIsDeleting(true);
     try {
       await deleteLaborProfile(selectedProfile.id);
-      // Toast for success is handled in deleteLaborProfile
       setIsDeleteAlertOpen(false);
       setSelectedProfile(null);
     } catch (error: any) {
-       // Toast for error is handled in deleteLaborProfile
       console.error("Error during profile deletion in page:", error);
     } finally {
       setIsDeleting(false);
@@ -149,6 +152,7 @@ export default function LaborPage() {
                     <TableHead>Photo</TableHead>
                     <TableHead>Name</TableHead>
                     <TableHead>Contact</TableHead>
+                    <TableHead className="whitespace-nowrap">Daily Salary</TableHead>
                     <TableHead className="whitespace-nowrap">Aadhaar No.</TableHead>
                     <TableHead className="whitespace-nowrap">PAN No.</TableHead>
                     <TableHead>Aadhaar Doc</TableHead>
@@ -175,6 +179,7 @@ export default function LaborPage() {
                       </TableCell>
                       <TableCell className="font-medium">{profile.name}</TableCell>
                       <TableCell>{profile.contact}</TableCell>
+                      <TableCell>{formatCurrency(profile.daily_salary)}</TableCell>
                       <TableCell>{profile.aadhaar_number || <span className="text-muted-foreground text-xs">N/A</span>}</TableCell>
                       <TableCell>{profile.pan_number || <span className="text-muted-foreground text-xs">N/A</span>}</TableCell>
                       <TableCell>{getFileDisplay(profile.aadhaar_url)}</TableCell>
@@ -218,7 +223,6 @@ export default function LaborPage() {
         </CardContent>
       </Card>
 
-      {/* View Profile Modal */}
       {selectedProfile && (
         <Dialog open={isViewModalOpen} onOpenChange={setIsViewModalOpen}>
           <DialogContent className="sm:max-w-md">
@@ -231,6 +235,7 @@ export default function LaborPage() {
             <div className="space-y-4 py-4">
               <p><strong>Name:</strong> {selectedProfile.name}</p>
               <p><strong>Contact:</strong> {selectedProfile.contact}</p>
+              <p><strong>Daily Salary:</strong> {formatCurrency(selectedProfile.daily_salary)}</p>
               <p><strong>Aadhaar Number:</strong> {selectedProfile.aadhaar_number || 'N/A'}</p>
               <p><strong>PAN Number:</strong> {selectedProfile.pan_number || 'N/A'}</p>
               <p><strong>Photo:</strong></p>
@@ -246,7 +251,6 @@ export default function LaborPage() {
         </Dialog>
       )}
 
-      {/* Edit Profile Modal */}
       {selectedProfile && (
         <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
           <DialogContent className="sm:max-w-lg">
@@ -268,7 +272,6 @@ export default function LaborPage() {
         </Dialog>
       )}
 
-      {/* Delete Confirmation Dialog */}
       {selectedProfile && (
         <AlertDialog open={isDeleteAlertOpen} onOpenChange={setIsDeleteAlertOpen}>
           <AlertDialogContent>
@@ -296,5 +299,3 @@ export default function LaborPage() {
     </div>
   );
 }
-
-    

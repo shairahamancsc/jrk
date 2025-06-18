@@ -6,7 +6,7 @@ import { useData } from '@/contexts/data-context';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { FileText, UserCircle2, Users, Loader2 } from 'lucide-react';
+import { FileText, UserCircle2, Users, Loader2, WalletCards } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import Image from 'next/image';
 
@@ -47,6 +47,11 @@ export default function AllLaborPage() {
     }
     return '';
   }
+
+  const formatCurrency = (amount?: number) => {
+    if (amount === undefined || amount === null) return <span className="text-muted-foreground text-xs">N/A</span>;
+    return `₹${amount.toFixed(2)}`;
+  };
   
   if (clientLoading || dataLoading) {
     return (
@@ -83,6 +88,7 @@ export default function AllLaborPage() {
                     <TableHead>Photo</TableHead>
                     <TableHead>Name</TableHead>
                     <TableHead>Contact</TableHead>
+                    <TableHead className="whitespace-nowrap">Daily Salary</TableHead>
                     <TableHead className="whitespace-nowrap">Aadhaar No.</TableHead>
                     <TableHead className="whitespace-nowrap">PAN No.</TableHead>
                     <TableHead>Aadhaar Doc</TableHead>
@@ -108,6 +114,7 @@ export default function AllLaborPage() {
                       </TableCell>
                       <TableCell className="font-medium text-sm sm:text-base">{profile.name}</TableCell>
                       <TableCell className="text-xs sm:text-sm">{profile.contact}</TableCell>
+                      <TableCell className="text-xs sm:text-sm">{formatCurrency(profile.daily_salary)}</TableCell>
                       <TableCell className="text-xs sm:text-sm">{profile.aadhaar_number || <span className="text-muted-foreground text-xs">N/A</span>}</TableCell>
                       <TableCell className="text-xs sm:text-sm">{profile.pan_number || <span className="text-muted-foreground text-xs">N/A</span>}</TableCell>
                       <TableCell>{getFileDisplay(profile.aadhaar_url)}</TableCell>

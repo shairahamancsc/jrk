@@ -14,7 +14,7 @@ interface DataContextType {
   addLaborProfile: (profileData: LaborProfileFormDataWithFiles) => Promise<void>;
   addAttendanceEntry: (entryData: Omit<AttendanceEntry, 'id' | 'created_at' | 'user_id'>) => Promise<void>;
   deleteLaborProfile: (profileId: string) => Promise<void>;
-  updateLaborProfile: (profileId: string, profileData: Partial<LaborProfileFormDataWithFiles>) => Promise<void>; // Partial for updates
+  updateLaborProfile: (profileId: string, profileData: Partial<LaborProfileFormDataWithFiles>) => Promise<void>; 
   fetchLaborProfileById: (profileId: string) => Promise<LaborProfile | null>;
   isLoading: boolean;
 }
@@ -23,13 +23,9 @@ const DataContext = createContext<DataContextType | undefined>(undefined);
 
 const STORAGE_BUCKET_NAME = 'profile-documents'; 
 
-// Helper function to extract file path from Supabase Storage URL
 const getPathFromUrl = (url: string): string | null => {
   try {
     const urlObject = new URL(url);
-    // Example URL: https://<project_ref>.supabase.co/storage/v1/object/public/<bucket_name>/<path_to_file>
-    // We want to extract <path_to_file>
-    // The path starts after `/storage/v1/object/public/BUCKET_NAME/`
     const prefix = `/storage/v1/object/public/${STORAGE_BUCKET_NAME}/`;
     if (urlObject.pathname.startsWith(prefix)) {
       return urlObject.pathname.substring(prefix.length);
@@ -132,14 +128,13 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       return undefined;
     }
     const sanitizedProfileName = profileName.replace(/[^a-zA-Z0-9-_]/g, '_');
-    // This fileName is the path within the bucket
     const filePathInBucket = `public/${user.id}/${sanitizedProfileName}_${Date.now()}_${file.name}`;
     
     const { data, error } = await supabase.storage
       .from(STORAGE_BUCKET_NAME)
       .upload(filePathInBucket, file, {
         cacheControl: '3600',
-        upsert: false, // Consider true for updates if file names can be the same
+        upsert: false, 
       });
 
     if (error) {
@@ -185,6 +180,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       contact: profileFormData.contact,
       aadhaar_number: profileFormData.aadhaarNumber,
       pan_number: profileFormData.panNumber,
+      daily_salary: profileFormData.dailySalary, // Added daily_salary
       photo_url,
       aadhaar_url,
       pan_url,
@@ -246,7 +242,6 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
             if (storageError) {
                 console.error('[DataProvider] Error deleting files from storage:', storageError);
                 toast({ variant: "destructive", title: "Storage Error", description: `Could not delete associated files: ${storageError.message}. Profile not deleted.` });
-                // Decide if you want to proceed with DB deletion if storage fails. Usually not.
                 throw storageError; 
             }
         }
@@ -255,7 +250,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
             .from('labor_profiles')
             .delete()
             .eq('id', profileId)
-            .eq('user_id', user.id); // Ensure user owns the profile
+            .eq('user_id', user.id); 
 
         if (dbError) {
             console.error('[DataProvider] Error deleting labor profile from database:', dbError);
@@ -268,33 +263,55 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
     } catch (error) {
         console.error('[DataProvider] Overall error in deleteLaborProfile:', error);
-        // Specific toasts are shown above, this is a fallback or re-throw.
-        // No generic toast here as specific ones are more informative.
-        throw error; // Re-throw to be caught by the calling component if needed
+        throw error; 
     } finally {
         setIsLoading(false);
     }
   };
   
-  // Placeholder for updateLaborProfile - to be implemented fully later
   const updateLaborProfile = async (profileId: string, profileData: Partial<LaborProfileFormDataWithFiles>) => {
     if (!user?.id) {
         toast({ variant: "destructive", title: "Auth Error", description: "User not authenticated." });
         return;
     }
     setIsLoading(true);
-    console.log('[DataProvider] Placeholder: updateLaborProfile called for ID:', profileId, 'with data:', profileData);
-    // Full implementation will involve:
-    // 1. Fetching the current profile to compare file URLs.
-    // 2. If new files are provided in profileData (as File objects):
-    //    a. Upload new files (get new URLs).
-    //    b. Delete old files from storage if they are being replaced.
-    // 3. If file fields are explicitly set to null/undefined, delete existing files.
-    // 4. Update the database record with new text data and new file URLs.
-    // 5. Refetch labor profiles.
-    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate async operation
+    // Placeholder for full implementation:
+    // This will need to handle file uploads/deletions similarly to addLaborProfile
+    // and then update the database record.
+    
+    // For now, construct the update object based on what might be provided
+    const updateObject: Partial<Database['public']['Tables']['labor_profiles']['Update']> = {
+      name: profileData.name,
+      contact: profileData.contact,
+      aadhaar_number: profileData.aadhaarNumber,
+      pan_number: profileData.panNumber,
+      daily_salary: profileData.dailySalary, // Added daily_salary
+      // File URLs would need to be handled here after uploading new files and deleting old ones if necessary
+    };
+
+    // Remove undefined fields from updateObject to prevent overwriting existing values with nulls
+    Object.keys(updateObject).forEach(key => updateObject[key as keyof typeof updateObject] === undefined && delete updateObject[key as keyof typeof updateObject]);
+
+
+    console.log('[DataProvider] Placeholder: updateLaborProfile called for ID:', profileId, 'with data:', profileData, 'updateObject:', updateObject);
+    // Actual update logic:
+    // const { data, error } = await supabase
+    //   .from('labor_profiles')
+    //   .update(updateObject) // This needs to be the Supabase Update type
+    //   .eq('id', profileId)
+    //   .eq('user_id', user.id)
+    //   .select()
+    //   .single();
+
+    // if (error) {
+    //   toast({ variant: "destructive", title: "Update Error", description: `Could not update profile: ${error.message}` });
+    // } else if (data) {
+    //   toast({ title: "Success", description: "Profile updated." });
+    //   await fetchLaborProfiles();
+    // }
+    await new Promise(resolve => setTimeout(resolve, 1000)); 
     toast({ title: "In Progress", description: "Update functionality is under development." });
-    await fetchLaborProfiles(); // Refetch for now
+    await fetchLaborProfiles(); 
     setIsLoading(false);
   };
 

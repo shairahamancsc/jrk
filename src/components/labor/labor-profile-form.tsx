@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { UserPlus, FileText, Loader2, Fingerprint, ScanLine, UserCircle2, FilePlus2 } from 'lucide-react';
+import { UserPlus, FileText, Loader2, Fingerprint, ScanLine, UserCircle2, FilePlus2, WalletCards } from 'lucide-react';
 import type { LaborProfile, LaborProfileFormDataWithFiles } from '@/types'; 
 
 interface LaborProfileFormProps {
@@ -38,6 +38,7 @@ export function LaborProfileForm({
       contact: existingProfile?.contact || '',
       aadhaarNumber: existingProfile?.aadhaar_number || '',
       panNumber: existingProfile?.pan_number || '',
+      dailySalary: existingProfile?.daily_salary || undefined,
       photo: undefined,
       aadhaar: undefined,
       pan: undefined,
@@ -52,6 +53,7 @@ export function LaborProfileForm({
         contact: existingProfile.contact,
         aadhaarNumber: existingProfile.aadhaar_number || '',
         panNumber: existingProfile.pan_number || '',
+        dailySalary: existingProfile.daily_salary || undefined,
         photo: undefined,
         aadhaar: undefined,
         pan: undefined,
@@ -64,6 +66,7 @@ export function LaborProfileForm({
         contact: '',
         aadhaarNumber: '',
         panNumber: '',
+        dailySalary: undefined,
         photo: undefined,
         aadhaar: undefined,
         pan: undefined,
@@ -81,6 +84,7 @@ export function LaborProfileForm({
       contact: data.contact,
       aadhaarNumber: data.aadhaarNumber,
       panNumber: data.panNumber ? data.panNumber.toUpperCase() : undefined,
+      dailySalary: data.dailySalary,
       photo: data.photo, 
       aadhaar: data.aadhaar,
       pan: data.pan,
@@ -176,7 +180,7 @@ export function LaborProfileForm({
                       className="hidden"
                       onChange={(e) => {
                         const file = e.target.files?.[0];
-                        form.setValue('photo', e.target.files, { shouldValidate: true }); // Pass FileList
+                        form.setValue('photo', e.target.files, { shouldValidate: true }); 
                         if (file) {
                           const reader = new FileReader();
                           reader.onloadend = () => {
@@ -184,10 +188,10 @@ export function LaborProfileForm({
                           };
                           reader.readAsDataURL(file);
                         } else {
-                          setPhotoPreviewUrl(existingProfile?.photo_url || null); // Revert to existing or null
+                          setPhotoPreviewUrl(existingProfile?.photo_url || null); 
                         }
                       }}
-                      ref={field.ref} // react-hook-form needs the ref
+                      ref={field.ref} 
                       disabled={isSubmitting}
                     />
                     <FormLabel
@@ -267,6 +271,33 @@ export function LaborProfileForm({
                 </FormItem>
               )}
             />
+            <FormField
+              control={form.control}
+              name="dailySalary"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="flex items-center gap-2 text-foreground">
+                    <WalletCards size={16} /> Daily Salary (₹) (Optional)
+                  </FormLabel>
+                  <FormControl>
+                    <Input 
+                      type="number"
+                      placeholder="Enter daily salary amount" 
+                      {...field} 
+                      value={field.value === undefined ? '' : String(field.value)}
+                      onChange={event => {
+                        const value = event.target.value;
+                        field.onChange(value === '' ? undefined : parseFloat(value));
+                      }}
+                      disabled={isSubmitting} 
+                      step="0.01"
+                      min="0"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
           </div>
 
           <h3 className="text-lg font-semibold text-primary pt-4 border-t mt-6">Upload Documents (Optional)</h3>
@@ -306,4 +337,3 @@ export function LaborProfileForm({
     </FormWrapper>
   );
 }
-

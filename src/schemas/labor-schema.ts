@@ -22,19 +22,23 @@ export const laborProfileSchema = z.object({
   contact: z.string().min(10, { message: "Contact number must be at least 10 digits" }).regex(/^\+?[0-9\s-()]{10,}$/, { message: "Invalid contact number format" }),
   aadhaarNumber: z.string()
     .optional()
-    .transform(val => val === "" ? undefined : val) // Treat empty string as undefined
+    .transform(val => val === "" ? undefined : val) 
     .refine(val => !val || aadhaarRegex.test(val), {
       message: "Invalid Aadhaar number format (must be 12 digits).",
     }),
   panNumber: z.string()
     .optional()
-    .transform(val => val === "" ? undefined : val) // Treat empty string as undefined
+    .transform(val => val === "" ? undefined : val) 
     .refine(val => !val || panRegex.test(val.toUpperCase()), {
       message: "Invalid PAN number format (e.g., ABCDE1234F).",
     }),
+  dailySalary: z.preprocess(
+    (val) => (val === "" || val === undefined || val === null || (typeof val === 'string' && val.trim() === '') ? undefined : Number(val)),
+    z.number().positive({ message: "Daily salary must be a positive number" }).optional()
+  ),
   photo: fileSchema,
-  aadhaar: fileSchema, // This is for Aadhaar document upload
-  pan: fileSchema,     // This is for PAN document upload
+  aadhaar: fileSchema, 
+  pan: fileSchema,     
   drivingLicense: fileSchema,
 });
 

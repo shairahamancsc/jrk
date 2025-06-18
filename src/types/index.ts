@@ -5,8 +5,9 @@ export interface LaborProfile {
   id: string; 
   name: string;
   contact: string;
-  aadhaar_number?: string; // New field for Aadhaar number
-  pan_number?: string;     // New field for PAN number
+  aadhaar_number?: string;
+  pan_number?: string;
+  daily_salary?: number; // New field for daily salary
   photo_url?: string; 
   aadhaar_url?: string; 
   pan_url?: string; 
@@ -46,8 +47,9 @@ export type Database = {
           user_id: string | null
           name: string
           contact: string
-          aadhaar_number: string | null // Added
-          pan_number: string | null     // Added
+          aadhaar_number: string | null
+          pan_number: string | null
+          daily_salary: number | null // Added daily_salary
           photo_url: string | null
           aadhaar_url: string | null
           pan_url: string | null
@@ -59,8 +61,9 @@ export type Database = {
           user_id?: string | null
           name: string
           contact: string
-          aadhaar_number?: string | null // Added
-          pan_number?: string | null     // Added
+          aadhaar_number?: string | null
+          pan_number?: string | null
+          daily_salary?: number | null // Added daily_salary
           photo_url?: string | null
           aadhaar_url?: string | null
           pan_url?: string | null
@@ -72,8 +75,9 @@ export type Database = {
           user_id?: string | null
           name?: string
           contact?: string
-          aadhaar_number?: string | null // Added
-          pan_number?: string | null     // Added
+          aadhaar_number?: string | null
+          pan_number?: string | null
+          daily_salary?: number | null // Added daily_salary
           photo_url?: string | null
           aadhaar_url?: string | null
           pan_url?: string | null
@@ -146,11 +150,12 @@ export type Database = {
   }
 }
 
-export interface LaborProfileFormDataWithFiles extends Omit<LaborProfile, 'id' | 'created_at' | 'photo_url' | 'aadhaar_url' | 'pan_url' | 'driving_license_url'> {
-  aadhaarNumber?: string; // Added from schema (text input)
-  panNumber?: string;     // Added from schema (text input)
+export interface LaborProfileFormDataWithFiles extends Omit<LaborProfile, 'id' | 'created_at' | 'photo_url' | 'aadhaar_url' | 'pan_url' | 'driving_license_url' | 'daily_salary'> {
+  aadhaarNumber?: string;
+  panNumber?: string;
+  dailySalary?: number; // Added dailySalary
   photo?: File;
-  aadhaar?: File; // This is for Aadhaar document upload
-  pan?: File;     // This is for PAN document upload
+  aadhaar?: File;
+  pan?: File;
   drivingLicense?: File;
 }
