@@ -30,13 +30,17 @@ const STORAGE_BUCKET_NAME = 'profile-documents';
 const getPathFromUrl = (url: string): string | null => {
   try {
     const urlObject = new URL(url);
-    const prefix = `/storage/v1/object/public/${STORAGE_BUCKET_NAME}/`;
-    if (urlObject.pathname.startsWith(prefix)) {
-      return urlObject.pathname.substring(prefix.length);
+    // Example URL: https://<project-ref>.supabase.co/storage/v1/object/public/profile-documents/public/user_id/profile_name_timestamp_filename.ext
+    // We want to extract: public/user_id/profile_name_timestamp_filename.ext
+    const pathSegments = urlObject.pathname.split('/');
+    const bucketNameIndex = pathSegments.indexOf(STORAGE_BUCKET_NAME);
+    if (bucketNameIndex !== -1 && bucketNameIndex + 1 < pathSegments.length) {
+      return pathSegments.slice(bucketNameIndex + 1).join('/');
     }
+    console.warn("Could not derive storage path from URL:", url);
     return null;
   } catch (e) {
-    console.error("Error parsing URL for file path:", e);
+    console.error("Error parsing URL for file path:", e, "URL:", url);
     return null;
   }
 };
@@ -82,12 +86,16 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         .eq('id', profileId)
         .eq('user_id', user.id)
         .single();
-    setIsLoading(false);
+    
     if (error) {
         console.error(`[DataProvider] Error fetching labor profile by ID ${profileId}:`, error);
-        toast({ variant: "destructive", title: "Fetch Error", description: `Could not fetch profile: ${error.message}` });
+        if (error.code !== 'PGRST116') { // PGRST116: "Searched for a single row, but found no rows" - not an error if profile doesn't exist for user
+             toast({ variant: "destructive", title: "Fetch Error", description: `Could not fetch profile: ${error.message}` });
+        }
+        setIsLoading(false);
         return null;
     }
+    setIsLoading(false);
     return data;
   };
 
@@ -173,6 +181,27 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
     const { data: { publicUrl } } = supabase.storage.from(STORAGE_BUCKET_NAME).getPublicUrl(filePathInBucket);
     return publicUrl;
+  };
+
+  const deleteFile = async (fileUrl: string | undefined | null): Promise<boolean> => {
+    if (!fileUrl) return false;
+    const filePath = getPathFromUrl(fileUrl);
+    if (!filePath) {
+      console.warn("[DataProvider] Could not determine path for deletion from URL:", fileUrl);
+      return false;
+    }
+
+    const { error } = await supabase.storage
+      .from(STORAGE_BUCKET_NAME)
+      .remove([filePath]);
+
+    if (error) {
+      console.error('[DataProvider] Error deleting file from storage:', filePath, error);
+      toast({ variant: "destructive", title: "Storage Error", description: `Could not delete old file: ${error.message}` });
+      return false;
+    }
+    console.log("[DataProvider] Successfully deleted old file:", filePath);
+    return true;
   };
 
   const addLaborProfile = async (profileFormData: LaborProfileFormDataWithFiles) => {
@@ -291,7 +320,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
     } catch (error) {
         console.error('[DataProvider] Overall error in deleteLaborProfile:', error);
-        throw error; 
+        // Do not re-throw here if toast is already shown for specific errors
     } finally {
         setIsLoading(false);
     }
@@ -303,22 +332,69 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         return;
     }
     setIsLoading(true);
+
+    const existingProfile = await fetchLaborProfileById(profileId);
+    if (!existingProfile) {
+        toast({ variant: "destructive", title: "Update Error", description: "Original profile not found." });
+        setIsLoading(false);
+        return;
+    }
     
     const updateObject: Partial<Database['public']['Tables']['labor_profiles']['Update']> = {
       name: profileData.name,
       contact: profileData.contact,
       aadhaar_number: profileData.aadhaarNumber,
-      pan_number: profileData.panNumber,
+      pan_number: profileData.panNumber ? profileData.panNumber.toUpperCase() : undefined,
       daily_salary: profileData.dailySalary, 
     };
 
-    Object.keys(updateObject).forEach(key => updateObject[key as keyof typeof updateObject] === undefined && delete updateObject[key as keyof typeof updateObject]);
-
-    console.log('[DataProvider] Placeholder: updateLaborProfile called for ID:', profileId, 'with data:', profileData, 'updateObject:', updateObject);
+    // Handle file updates
+    if (profileData.photo instanceof File) {
+      await deleteFile(existingProfile.photo_url);
+      updateObject.photo_url = await uploadFile(profileData.photo, profileData.name || existingProfile.name);
+    }
+    if (profileData.aadhaar instanceof File) {
+      await deleteFile(existingProfile.aadhaar_url);
+      updateObject.aadhaar_url = await uploadFile(profileData.aadhaar, profileData.name || existingProfile.name);
+    }
+    if (profileData.pan instanceof File) {
+      await deleteFile(existingProfile.pan_url);
+      updateObject.pan_url = await uploadFile(profileData.pan, profileData.name || existingProfile.name);
+    }
+    if (profileData.drivingLicense instanceof File) {
+      await deleteFile(existingProfile.driving_license_url);
+      updateObject.driving_license_url = await uploadFile(profileData.drivingLicense, profileData.name || existingProfile.name);
+    }
     
-    await new Promise(resolve => setTimeout(resolve, 1000)); 
-    toast({ title: "In Progress", description: "Update functionality is under development." });
-    await fetchLaborProfiles(); 
+    // Remove undefined fields from updateObject to avoid overwriting with null
+    Object.keys(updateObject).forEach(key => {
+        const typedKey = key as keyof typeof updateObject;
+        if (updateObject[typedKey] === undefined) {
+            delete updateObject[typedKey];
+        }
+    });
+
+    if (Object.keys(updateObject).length === 0) {
+      toast({ title: "No Changes", description: "No new information was provided to update."});
+      setIsLoading(false);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from('labor_profiles')
+      .update(updateObject)
+      .eq('id', profileId)
+      .eq('user_id', user.id) // Ensure user can only update their own profiles
+      .select()
+      .single();
+
+    if (error) {
+      console.error('[DataProvider] Error updating labor profile:', error);
+      toast({ variant: "destructive", title: "Update Failed", description: `Could not update profile: ${error.message}` });
+    } else if (data) {
+      await fetchLaborProfiles(); // Refresh the list
+      toast({ title: "Success", description: `Profile for ${data.name} updated.` });
+    }
     setIsLoading(false);
   };
 
@@ -419,3 +495,4 @@ export const useData = () => {
   }
   return context;
 };
+
