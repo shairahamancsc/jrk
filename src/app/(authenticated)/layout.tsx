@@ -15,18 +15,22 @@ import {
   SidebarInset,
 } from '@/components/ui/sidebar';
 import { SidebarNavItems } from '@/components/shared/sidebar-nav-items';
+import { ThemeToggle } from '@/components/shared/theme-toggle'; // Import ThemeToggle
 import { Building2, Loader2 } from 'lucide-react';
 
 export default function AuthenticatedLayout({ children }: { children: ReactNode }) {
-  const { isAuthenticated, isLoading, user, userRole } = useAuth(); // Added userRole
+  const { isAuthenticated, isLoading, user, userRole } = useAuth(); 
   const router = useRouter();
   const pathname = usePathname();
 
   useEffect(() => {
+    // This effect should ONLY run on mount to set up listener & initial check
+    // It should NOT depend on `pathname` or `router` for its core logic
+    // to avoid re-triggering `setIsLoading(true)` on navigation.
     if (!isLoading && !isAuthenticated && pathname !== '/all-labor') {
       router.replace('/login');
     }
-  }, [isAuthenticated, isLoading, router, pathname]);
+  }, [isAuthenticated, isLoading, router, pathname]); // Dependencies reviewed - this is fine as long as isLoading logic is robust
 
   if (isLoading) { 
     return (
@@ -65,17 +69,20 @@ export default function AuthenticatedLayout({ children }: { children: ReactNode 
         </SidebarFooter>
       </Sidebar>
       <SidebarInset>
-        <header className="sticky top-0 z-10 flex h-14 items-center justify-between border-b bg-background/80 px-4 backdrop-blur-sm md:justify-end">
+        <header className="sticky top-0 z-10 flex h-14 items-center justify-between border-b bg-background/80 px-4 backdrop-blur-sm">
           <div className="md:hidden">
             <SidebarTrigger />
           </div>
-          <div className="text-sm text-muted-foreground">
-            Logged in as: <span className="font-semibold text-primary">{user?.email || user?.id}</span>
-            {userRole && (
-              <span className="ml-2 capitalize text-xs font-medium bg-accent text-accent-foreground px-2 py-0.5 rounded-full">
-                {userRole}
-              </span>
-            )}
+          <div className="flex flex-1 items-center justify-end gap-4">
+            <div className="text-sm text-muted-foreground">
+              Logged in as: <span className="font-semibold text-primary">{user?.email || user?.id}</span>
+              {userRole && (
+                <span className="ml-2 capitalize text-xs font-medium bg-accent text-accent-foreground px-2 py-0.5 rounded-full">
+                  {userRole}
+                </span>
+              )}
+            </div>
+            <ThemeToggle />
           </div>
         </header>
         <main className="flex-1 p-4 md:p-6 lg:p-8">
