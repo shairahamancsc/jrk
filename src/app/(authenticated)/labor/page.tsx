@@ -130,13 +130,13 @@ export default function LaborPage() {
 
   return (
     <div className="space-y-8">
-      <h1 className="text-3xl font-headline font-bold text-primary">Manage Labor Profiles</h1>
+      <h1 className="text-2xl sm:text-3xl font-headline font-bold text-primary">Manage Labor Profiles</h1>
       
       <LaborProfileForm />
 
       <Card className="shadow-lg">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-2xl text-primary font-headline">
+          <CardTitle className="flex items-center gap-2 text-xl sm:text-2xl text-primary font-headline">
             <Users /> Existing Labor Profiles
           </CardTitle>
           <CardDescription>
