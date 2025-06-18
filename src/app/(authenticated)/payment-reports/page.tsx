@@ -148,14 +148,10 @@ export default function PaymentReportsPage() {
 
     try {
       await addPaymentHistoryEntry(paymentDataToSave);
-      // Optionally, re-fetch payment history or update reportData to reflect payment
-      // For now, just close dialog and show toast (toast is handled in DataContext)
       setIsRecordPaymentDialogOpen(false);
       setSelectedLaborForPayment(null);
-      // Potentially disable the button for this entry on the report or show "Paid"
     } catch (error) {
       console.error("Error submitting payment record:", error);
-      // Toast for error is handled by DataContext or can be added here
     } finally {
       setIsSubmittingPayment(false);
     }
@@ -171,23 +167,23 @@ export default function PaymentReportsPage() {
   }
 
   return (
-    <div className="space-y-8">
-      <header className="space-y-2">
-        <h1 className="text-3xl font-headline font-bold text-primary flex items-center gap-2">
-          <Calculator size={32} /> Payment Reports
+    <div className="space-y-6 sm:space-y-8">
+      <header className="space-y-1 sm:space-y-2">
+        <h1 className="text-2xl sm:text-3xl font-headline font-bold text-primary flex items-center gap-2">
+          <Calculator size={28} sm:size={32} /> Payment Reports
         </h1>
-        <p className="text-muted-foreground">
+        <p className="text-sm sm:text-base text-muted-foreground">
           Generate payment reports and record payments for labor based on attendance and advances.
         </p>
       </header>
 
       <Card className="shadow-lg">
         <CardHeader>
-          <CardTitle>Select Date Range</CardTitle>
-          <CardDescription>Choose the start and end dates for the payment period.</CardDescription>
+          <CardTitle className="text-lg sm:text-xl">Select Date Range</CardTitle>
+          <CardDescription className="text-xs sm:text-sm">Choose the start and end dates for the payment period.</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="flex flex-col sm:flex-row gap-4">
+        <CardContent className="space-y-4">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
             <Popover>
               <PopoverTrigger asChild>
                 <Button
@@ -240,15 +236,15 @@ export default function PaymentReportsPage() {
           <Button 
             onClick={handleGenerateReport} 
             disabled={isCalculating || !startDate || !endDate}
-            className="bg-primary hover:bg-primary/90"
+            className="bg-primary hover:bg-primary/90 w-full sm:w-auto"
           >
             {isCalculating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {isCalculating ? "Generating..." : "Generate Report"}
           </Button>
           {calculationError && (
-            <div className="flex items-center gap-2 text-destructive p-3 bg-destructive/10 rounded-md">
-              <AlertTriangle size={18} />
-              <p className="text-sm font-medium">{calculationError}</p>
+            <div className="flex items-center gap-2 text-destructive p-2 sm:p-3 bg-destructive/10 rounded-md">
+              <AlertTriangle size={16} sm:size={18} />
+              <p className="text-xs sm:text-sm font-medium">{calculationError}</p>
             </div>
           )}
         </CardContent>
@@ -257,10 +253,10 @@ export default function PaymentReportsPage() {
       {reportData && (
         <Card className="shadow-lg">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-2xl text-primary font-headline">
+            <CardTitle className="flex items-center gap-2 text-xl sm:text-2xl text-primary font-headline">
                 <Banknote /> Report Results
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-xs sm:text-sm">
                 Payment details for {startDate ? format(startDate, "PP") : ""} - {endDate ? format(endDate, "PP") : ""}.
             </CardDescription>
           </CardHeader>
@@ -270,25 +266,26 @@ export default function PaymentReportsPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Labor Name</TableHead>
-                      <TableHead className="text-right">Net Amount Due</TableHead>
-                      <TableHead className="text-center">Actions</TableHead>
+                      <TableHead className="px-2 py-3 md:px-4 text-xs sm:text-sm">Labor Name</TableHead>
+                      <TableHead className="text-right px-2 py-3 md:px-4 text-xs sm:text-sm">Net Amount Due</TableHead>
+                      <TableHead className="text-center px-2 py-3 md:px-4 text-xs sm:text-sm">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {reportData.map((entry) => (
                       <TableRow key={entry.laborId}>
-                        <TableCell className="font-medium">{entry.laborName}</TableCell>
-                        <TableCell className="text-right font-semibold text-primary">{formatCurrency(entry.netPayment)}</TableCell>
-                        <TableCell className="text-center">
+                        <TableCell className="font-medium px-2 py-3 md:px-4 text-xs sm:text-sm">{entry.laborName}</TableCell>
+                        <TableCell className="text-right font-semibold text-primary px-2 py-3 md:px-4 text-xs sm:text-sm">{formatCurrency(entry.netPayment)}</TableCell>
+                        <TableCell className="text-center px-2 py-3 md:px-4">
                           {entry.netPayment > 0 ? (
                             <Button 
                               variant="outline" 
                               size="sm"
+                              className="text-xs h-8"
                               onClick={() => handleOpenRecordPaymentDialog(entry)}
                               disabled={!startDate || !endDate}
                             >
-                              <CreditCard className="mr-2 h-4 w-4" />
+                              <CreditCard className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
                               Record Payment
                             </Button>
                           ) : (
@@ -301,14 +298,14 @@ export default function PaymentReportsPage() {
                 </Table>
               </div>
             ) : (
-              <p className="text-center text-muted-foreground py-8">No payment data found for the selected criteria or no labor profiles available.</p>
+              <p className="text-center text-muted-foreground py-8 text-sm sm:text-base">No payment data found for the selected criteria or no labor profiles available.</p>
             )}
           </CardContent>
           {reportData.length > 0 && (
-            <CardFooter className="flex flex-col items-end pt-6 border-t">
+            <CardFooter className="flex flex-col items-end pt-4 sm:pt-6 border-t">
                 <div className="text-right">
-                    <p className="text-lg font-semibold text-primary">Gross Total Amount to be Paid:</p>
-                    <p className="text-2xl font-bold text-primary">{formatCurrency(grossTotal)}</p>
+                    <p className="text-base sm:text-lg font-semibold text-primary">Gross Total Amount to be Paid:</p>
+                    <p className="text-xl sm:text-2xl font-bold text-primary">{formatCurrency(grossTotal)}</p>
                 </div>
             </CardFooter>
           )}
@@ -320,30 +317,30 @@ export default function PaymentReportsPage() {
             if (!isOpen) setSelectedLaborForPayment(null);
             setIsRecordPaymentDialogOpen(isOpen);
         }}>
-          <DialogContent className="sm:max-w-md">
+          <DialogContent className="w-[90vw] max-w-xs sm:max-w-md rounded-lg">
             <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
+              <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
                 <CreditCard /> Record Payment for {selectedLaborForPayment.laborName}
               </DialogTitle>
-              <DialogDescription>
+              <DialogDescription className="text-xs sm:text-sm">
                 Period: {format(startDate, "PP")} - {format(endDate, "PP")}
               </DialogDescription>
             </DialogHeader>
             <Form {...paymentForm}>
-              <form onSubmit={paymentForm.handleSubmit(onSubmitPaymentRecord)} className="space-y-4 py-2">
+              <form onSubmit={paymentForm.handleSubmit(onSubmitPaymentRecord)} className="space-y-3 sm:space-y-4 py-2">
                 <FormField
                   control={paymentForm.control}
                   name="paymentDate"
                   render={({ field }) => (
                     <FormItem className="flex flex-col">
-                      <FormLabel>Payment Date</FormLabel>
+                      <FormLabel className="text-xs sm:text-sm">Payment Date</FormLabel>
                       <Popover>
                         <PopoverTrigger asChild>
                           <FormControl>
                             <Button
                               variant={"outline"}
                               className={cn(
-                                "w-full pl-3 text-left font-normal",
+                                "w-full pl-3 text-left font-normal text-xs sm:text-sm",
                                 !field.value && "text-muted-foreground"
                               )}
                             >
@@ -362,7 +359,7 @@ export default function PaymentReportsPage() {
                           />
                         </PopoverContent>
                       </Popover>
-                      <FormMessage />
+                      <FormMessage className="text-xs"/>
                     </FormItem>
                   )}
                 />
@@ -371,20 +368,20 @@ export default function PaymentReportsPage() {
                   name="amountPaid"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Amount Paid (₹)</FormLabel>
+                      <FormLabel className="text-xs sm:text-sm">Amount Paid (₹)</FormLabel>
                       <FormControl>
                         <div className="relative">
-                            <span className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground flex items-center justify-center">₹</span>
+                            <span className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground flex items-center justify-center text-xs sm:text-sm">₹</span>
                             <Input 
                                 type="number" 
                                 placeholder="Enter amount" 
                                 {...field} 
-                                className="pl-7"
+                                className="pl-7 text-xs sm:text-sm"
                                 step="0.01"
                             />
                         </div>
                       </FormControl>
-                      <FormMessage />
+                      <FormMessage className="text-xs"/>
                     </FormItem>
                   )}
                 />
@@ -393,15 +390,15 @@ export default function PaymentReportsPage() {
                   name="notes"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Notes (Optional)</FormLabel>
+                      <FormLabel className="text-xs sm:text-sm">Notes (Optional)</FormLabel>
                       <FormControl>
-                        <Textarea placeholder="Enter any notes for this payment" {...field} />
+                        <Textarea placeholder="Enter any notes for this payment" {...field} className="text-xs sm:text-sm"/>
                       </FormControl>
-                      <FormMessage />
+                      <FormMessage className="text-xs"/>
                     </FormItem>
                   )}
                 />
-                <DialogFooter className="pt-4">
+                <DialogFooter className="pt-3 sm:pt-4">
                   <Button 
                     variant="outline" 
                     onClick={() => {
@@ -410,10 +407,12 @@ export default function PaymentReportsPage() {
                     }}
                     disabled={isSubmittingPayment}
                     type="button"
+                    size="sm"
+                    className="text-xs sm:text-sm"
                   >
                     Cancel
                   </Button>
-                  <Button type="submit" disabled={isSubmittingPayment} className="bg-primary hover:bg-primary/90">
+                  <Button type="submit" disabled={isSubmittingPayment} className="bg-primary hover:bg-primary/90" size="sm">
                     {isSubmittingPayment && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     {isSubmittingPayment ? "Recording..." : "Record Payment"}
                   </Button>
@@ -426,3 +425,4 @@ export default function PaymentReportsPage() {
     </div>
   );
 }
+
