@@ -4,7 +4,7 @@
 import { useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
-import { Loader2 } from 'lucide-react';
+import SplashScreen from '@/components/shared/splash-screen'; // Import the SplashScreen
 
 export default function HomePage() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -36,9 +36,21 @@ export default function HomePage() {
     }
   }, [isAuthenticated, isLoading, router, pathname]);
 
+  // Show SplashScreen while initial authentication check is in progress
+  if (isLoading) {
+    return <SplashScreen />;
+  }
+
+  // Fallback content or null if navigation handles everything before render
+  // This part is typically reached only briefly or if redirects haven't completed.
+  // A splash screen is a good default here too if isLoading is false but redirects are pending.
+  // However, the primary loading state is handled by `if (isLoading)` above.
   return (
     <div className="flex h-screen w-full items-center justify-center bg-background">
-      <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      {/* This content is shown if isLoading is false but redirection hasn't happened yet.
+          For a cleaner experience, often this can be null or another generic loader,
+          but SplashScreen is fine too if preferred. */}
+      <SplashScreen />
     </div>
   );
 }

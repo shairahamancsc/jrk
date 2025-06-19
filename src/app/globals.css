@@ -87,3 +87,19 @@
     @apply bg-background text-foreground;
   }
 }
+
+@layer utilities {
+  @keyframes jrk-logo-pulse {
+    0%, 100% {
+      transform: scale(1);
+      opacity: 0.8;
+    }
+    50% {
+      transform: scale(1.05);
+      opacity: 1;
+    }
+  }
+  .animate-jrk-logo-pulse {
+    animation: jrk-logo-pulse 2s infinite ease-in-out;
+  }
+}
