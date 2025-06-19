@@ -16,7 +16,6 @@ export default function SplashScreen() {
           JRK
         </span>
       </div>
-      <p className="mt-6 text-lg text-muted-foreground">Loading...</p>
     </div>
   );
 }
