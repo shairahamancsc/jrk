@@ -109,17 +109,16 @@
 @layer components {
   .fancy-hover-button {
     @apply relative flex items-center justify-center rounded-full shadow-md cursor-pointer;
-    @apply transition-all duration-500 ease-in-out;
+    @apply transition-all duration-300 ease-in-out; /* UPDATED DURATION */
     width: theme('spacing.12'); /* 48px */
     height: theme('spacing.12'); /* 48px */
     background-color: hsl(var(--sidebar-background));
-    /* box-shadow: 0 10px 25px rgba(0,0,0,0.1); */ /* Tailwind shadow-md is fine */
     overflow: visible; /* Allow pseudo-elements to be outside */
   }
 
   .fancy-hover-button::before { /* Gradient overlay */
     content: "";
-    @apply absolute inset-0 rounded-full transition-opacity duration-500 ease-in-out;
+    @apply absolute inset-0 rounded-full transition-opacity duration-300 ease-in-out; /* UPDATED DURATION */
     background: linear-gradient(45deg, hsl(var(--primary)), hsl(var(--accent)));
     opacity: 0;
     z-index: 0; /* Behind content */
@@ -127,7 +126,7 @@
 
   .fancy-hover-button::after { /* Blurred shadow */
     content: "";
-    @apply absolute rounded-full transition-opacity duration-500 ease-in-out;
+    @apply absolute rounded-full transition-opacity duration-300 ease-in-out; /* UPDATED DURATION */
     top: 8px; /* Adjust position of shadow */
     left: 50%;
     width: 80%; /* Adjust size of shadow */
@@ -141,7 +140,6 @@
 
   .fancy-hover-button:hover {
     width: 180px;
-    /* box-shadow: 0 10px 25px rgba(0,0,0,0); */ /* Example removes shadow, we can keep Tailwind's or adjust */
   }
 
   .fancy-hover-button:hover::before {
@@ -153,9 +151,9 @@
   }
 
   .fancy-hover-button .button-icon-wrapper {
-    @apply transition-all duration-500 ease-in-out text-sidebar-foreground;
+    @apply transition-all duration-150 ease-in-out text-sidebar-foreground; /* UPDATED DURATION */
     z-index: 1;
-    transition-delay: 0.25s; /* Delay hiding the icon */
+    transition-delay: 0.15s; /* UPDATED DELAY for unhover */
   }
    .fancy-hover-button .button-icon-wrapper > svg {
     @apply w-5 h-5; /* Ensure consistent icon size */
@@ -165,23 +163,23 @@
   .fancy-hover-button:hover .button-icon-wrapper {
     transform: scale(0);
     opacity: 0;
-    transition-delay: 0s; /* Hide immediately on hover out (effectively) */
+    transition-delay: 0s; /* Keep 0s delay for hiding on hover */
   }
 
   .fancy-hover-button .button-title-wrapper {
-    @apply absolute whitespace-nowrap uppercase transition-all duration-500 ease-in-out text-primary-foreground;
+    @apply absolute whitespace-nowrap uppercase transition-all duration-200 ease-in-out text-primary-foreground; /* UPDATED DURATION */
     font-size: 0.9em; /* Adjust as needed */
     letter-spacing: 0.075em;
     transform: scale(0);
     opacity: 0;
     z-index: 1;
-    transition-delay: 0s; /* Start hidden */
+    transition-delay: 0s; /* Keep 0s delay for hiding on unhover */
   }
   
   .fancy-hover-button:hover .button-title-wrapper {
     transform: scale(1);
     opacity: 1;
-    transition-delay: 0.25s; /* Delay showing the title */
+    transition-delay: 0.1s; /* UPDATED DELAY for appearing on hover */
   }
 }
 
