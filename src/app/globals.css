@@ -103,6 +103,14 @@
   .animate-jrk-logo-pulse {
     animation: jrk-logo-pulse 2s infinite ease-in-out;
   }
+
+  @keyframes fadeInPage {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .animate-fadeInPage {
+    animation: fadeInPage 0.4s ease-out forwards;
+  }
 }
 
 /* Styles for the new sidebar hover effect */

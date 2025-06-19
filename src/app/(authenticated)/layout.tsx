@@ -49,7 +49,7 @@ export default function AuthenticatedLayout({ children }: { children: ReactNode 
   }
   
   if (!isAuthenticated && pathname === '/all-labor') {
-    return <main className="flex-1 p-4 md:p-6 lg:p-8">{children}</main>;
+    return <main className="flex-1 p-4 md:p-6 lg:p-8 animate-fadeInPage">{children}</main>;
   }
 
   return (
@@ -85,7 +85,7 @@ export default function AuthenticatedLayout({ children }: { children: ReactNode 
             <ThemeToggle />
           </div>
         </header>
-        <main className="flex-1 p-4 md:p-6 lg:p-8">
+        <main className="flex-1 p-4 md:p-6 lg:p-8 animate-fadeInPage">
           {children}
         </main>
       </SidebarInset>
