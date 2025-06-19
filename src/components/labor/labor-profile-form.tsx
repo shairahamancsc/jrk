@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { laborProfileSchema, type LaborProfileFormData } from '@/schemas/labor-schema';
@@ -54,7 +54,7 @@ const LaborProfileFormComponent = ({
         aadhaarNumber: existingProfile.aadhaar_number || '',
         panNumber: existingProfile.pan_number || '',
         dailySalary: existingProfile.daily_salary || undefined,
-        photo: undefined,
+        photo: undefined, // Important: Do not reset file inputs if they are not part of the RHF's managed state here
         aadhaar: undefined,
         pan: undefined,
         drivingLicense: undefined,
@@ -74,7 +74,7 @@ const LaborProfileFormComponent = ({
       });
       setPhotoPreviewUrl(null);
     }
-  }, [existingProfile?.id, mode]);
+  }, [existingProfile?.id, mode, form.reset]);
 
 
   const onSubmit = async (data: LaborProfileFormData) => {
@@ -117,7 +117,7 @@ const LaborProfileFormComponent = ({
       </FormLabel>
       {mode === 'edit' && currentFileUrl && (
         <div className="text-xs text-muted-foreground mb-1">
-          Current: <a href={currentFileUrl} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">{currentFileUrl.substring(currentFileUrl.lastIndexOf('/') + 1)}</a>
+          Current: <a href={currentFileUrl} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">{decodeURIComponent(currentFileUrl.substring(currentFileUrl.lastIndexOf('/') + 1).split('?')[0].substring(currentFileUrl.substring(currentFileUrl.lastIndexOf('/') + 1).split('?')[0].indexOf('_', currentFileUrl.substring(currentFileUrl.lastIndexOf('/') + 1).split('?')[0].indexOf('_') + 1) + 1))}</a>
           <p className="text-xs">(To change, select a new file below.)</p>
         </div>
       )}
@@ -158,7 +158,7 @@ const LaborProfileFormComponent = ({
   return (
     <FormWrapper>
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3 md:space-y-4">
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-2 sm:space-y-3 md:space-y-4">
           
           <FormField
             control={form.control}
@@ -192,6 +192,8 @@ const LaborProfileFormComponent = ({
                         }
                       }}
                       ref={field.ref} 
+                      name={field.name} // Ensure name is passed for RHF
+                      onBlur={field.onBlur} // Ensure onBlur is passed for RHF
                       disabled={isSubmitting}
                     />
                     <FormLabel
@@ -304,7 +306,7 @@ const LaborProfileFormComponent = ({
 
           <h3 className="text-base sm:text-lg font-semibold text-primary pt-3 border-t mt-4">Upload Documents (Optional)</h3>
           <p className="text-xs sm:text-sm text-muted-foreground -mt-3 mb-3">These are for document copies (images/PDFs). The numbers are entered above.</p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 sm:gap-3 md:gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-1 sm:gap-2 md:gap-3">
             <GenericFileInput fieldName="aadhaar" label="Aadhaar Card Document" currentFileUrl={existingProfile?.aadhaar_url} />
             <GenericFileInput fieldName="pan" label="PAN Card Document" currentFileUrl={existingProfile?.pan_url}/>
             <GenericFileInput fieldName="drivingLicense" label="Driving License Document" currentFileUrl={existingProfile?.driving_license_url} />
@@ -341,5 +343,3 @@ const LaborProfileFormComponent = ({
 }
 
 export const LaborProfileForm = React.memo(LaborProfileFormComponent);
-
-    
