@@ -74,7 +74,7 @@ const LaborProfileFormComponent = ({
       });
       setPhotoPreviewUrl(null);
     }
-  }, [existingProfile?.id, mode, form]);
+  }, [existingProfile?.id, mode]);
 
 
   const onSubmit = async (data: LaborProfileFormData) => {
@@ -165,10 +165,10 @@ const LaborProfileFormComponent = ({
             name="photo"
             render={({ field }) => (
               <FormItem className="flex flex-col items-center space-y-2">
-                <Avatar className="h-16 w-16 sm:h-20 md:h-24 border-2 border-muted-foreground/50">
+                <Avatar className="h-12 w-12 sm:h-16 md:h-20 border-2 border-muted-foreground/50">
                   <AvatarImage src={photoPreviewUrl || existingProfile?.photo_url || ''} alt="Profile Photo Preview" data-ai-hint="profile person" />
                   <AvatarFallback>
-                    <UserCircle2 className="h-10 w-10 sm:h-12 md:h-16 text-muted-foreground" />
+                    <UserCircle2 className="h-8 w-8 sm:h-10 md:h-12 text-muted-foreground" />
                   </AvatarFallback>
                 </Avatar>
                 <FormControl>
@@ -208,7 +208,7 @@ const LaborProfileFormComponent = ({
             )}
           />
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 sm:gap-3 md:gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-1 sm:gap-2 md:gap-3">
             <FormField
               control={form.control}
               name="name"
