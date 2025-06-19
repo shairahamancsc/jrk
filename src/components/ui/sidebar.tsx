@@ -401,7 +401,7 @@ const SidebarContent = React.forwardRef<
       data-sidebar="content"
       className={cn(
         "flex min-h-0 flex-1 flex-col gap-2",
-        "overflow-y-auto overflow-x-hidden group-data-[collapsible=icon]:overflow-x-visible group-data-[collapsible=icon]:overflow-y-auto", // Allow x-overflow when collapsed for hover effect
+        "overflow-y-auto group-data-[collapsible=icon]:overflow-x-visible group-data-[collapsible=icon]:overflow-y-auto", // Allow x-overflow when collapsed for hover effect
         className
       )}
       {...props}
@@ -553,37 +553,43 @@ const SidebarMenuButton = React.forwardRef<
     const Comp = asChild ? Slot : "button"
     const { isMobile, state } = useSidebar()
 
-    // Separate icon and title from children for custom styling
-    // This assumes children are [icon, titleSpan]
-    let icon: React.ReactNode = null;
-    let title: React.ReactNode = null;
+    // Logic to prepare icon and title for the fancy hover effect,
+    // primarily for the asChild=false case.
+    let iconNode: React.ReactNode = null;
+    let titleNode: React.ReactNode = null;
 
-    if (React.Children.count(children) === 2) {
-      const childArray = React.Children.toArray(children);
-      icon = childArray[0];
-      title = childArray[1];
-    } else if (React.Children.count(children) === 1 && typeof children !== 'string') {
-      // If only one child and it's not a string, assume it's the icon (e.g. logout button)
-      icon = children;
+    if (!asChild) { // This block is for when Comp is 'button'
+        if (React.Children.count(children) === 2) {
+            const childArray = React.Children.toArray(children);
+            iconNode = childArray[0];
+            titleNode = childArray[1];
+        } else if (React.Children.count(children) === 1 && typeof children !== 'string') {
+            iconNode = children;
+        }
     }
-
-
-    const buttonContent = (
-      <>
-        {icon && <div className="button-icon-wrapper">{icon}</div>}
-        {title && <div className="button-title-wrapper">{title}</div>}
-        {!icon && !title && children} {/* Fallback for other cases */}
-      </>
-    );
+    // When asChild is true, props.children (e.g., <Link><Icon/><span>Title</span></Link>) is passed directly to Slot.
+    // The fancy hover CSS will need to target svg/span inside the Link for that case.
     
+    const buttonVisualContent = !asChild ? (
+      // Use a div wrapper instead of React.Fragment, styled to be layout-neutral.
+      // This div is the direct child of the <button> element.
+      <div style={{ display: 'contents' }}> 
+        {iconNode && <div className="button-icon-wrapper">{iconNode}</div>}
+        {titleNode && <div className="button-title-wrapper">{titleNode}</div>}
+        {/* Fallback if iconNode/titleNode couldn't be determined for asChild=false */}
+        {!iconNode && !titleNode && children} 
+      </div>
+    ) : children; // For asChild=true, pass original children to Slot
+
+
     const buttonClasses = cn(
       sidebarMenuButtonVariants({ variant, size }),
-      "group-data-[collapsible=icon]:fancy-hover-button", // Apply main class for effect
+      "group-data-[collapsible=icon]:fancy-hover-button", 
       className
     );
 
 
-    const button = (
+    const buttonElement = (
       <Comp
         ref={ref}
         data-sidebar="menu-button"
@@ -592,36 +598,52 @@ const SidebarMenuButton = React.forwardRef<
         className={buttonClasses}
         {...props}
       >
-        {buttonContent}
+        {buttonVisualContent}
       </Comp>
     )
 
-    if (!tooltip || (state === "expanded" && !isMobile)) { // Hide tooltip if sidebar is expanded
-      return button
+    if (!tooltip || (state === "expanded" && !isMobile)) { 
+      return buttonElement
     }
     
-    if (state === "collapsed" && !isMobile && title && typeof title === 'object' && title !== null && 'props' in title && 'children' in title.props) {
-        // Use the actual title text for the tooltip when collapsed
-        tooltip = {
-            children: title.props.children,
-            className: "bg-primary text-primary-foreground"
+    // Prepare tooltip content
+    let tooltipContentValue: React.ReactNode;
+    if (state === "collapsed" && !isMobile ) {
+        // Attempt to get title text from children for tooltip if not explicitly provided
+        // This is a heuristic and might need refinement based on actual children structure.
+        let potentialTitleText = "";
+        if (asChild) {
+            // If asChild, children is likely <Link><Icon/><span>Title Text</span></Link>
+            // Try to find a span within props.children (the Link)
+            React.Children.forEach(props.children, (child) => {
+                if (React.isValidElement(child) && child.type === 'a' && child.props.children) { // Assuming Link renders an <a>
+                     React.Children.forEach(child.props.children, (innerChild) => {
+                        if (React.isValidElement(innerChild) && innerChild.type === 'span') {
+                            potentialTitleText = innerChild.props.children as string;
+                        }
+                     });
+                }
+            });
+        } else if (titleNode && React.isValidElement(titleNode) && titleNode.type === 'span') {
+            // If not asChild, and we extracted titleNode as a span
+            potentialTitleText = titleNode.props.children as string;
         }
-    } else if (typeof tooltip === 'string') {
-        tooltip = {
-            children: tooltip,
-            className: "bg-primary text-primary-foreground"
-        }
+        
+        tooltipContentValue = (typeof tooltip === 'string' ? tooltip : potentialTitleText) || "Menu Item";
+    } else {
+        tooltipContentValue = typeof tooltip === 'string' ? tooltip : "Menu Item";
     }
+    
+    const tooltipProps = typeof tooltip === 'object' ? tooltip : { children: tooltipContentValue, className: "bg-primary text-primary-foreground" };
 
 
     return (
       <Tooltip>
-        <TooltipTrigger asChild>{button}</TooltipTrigger>
+        <TooltipTrigger asChild>{buttonElement}</TooltipTrigger>
         <TooltipContent
           side="right"
           align="center"
-          // hidden={state !== "collapsed" || isMobile} // Logic handled above
-          {...(tooltip as React.ComponentProps<typeof TooltipContent>)} // Ensure tooltip is object
+          {...tooltipProps}
         />
       </Tooltip>
     )
