@@ -54,7 +54,7 @@ const LaborProfileFormComponent = ({
         aadhaarNumber: existingProfile.aadhaar_number || '',
         panNumber: existingProfile.pan_number || '',
         dailySalary: existingProfile.daily_salary || undefined,
-        photo: undefined, // Important: Do not reset file inputs if they are not part of the RHF's managed state here
+        photo: undefined,
         aadhaar: undefined,
         pan: undefined,
         drivingLicense: undefined,
@@ -180,7 +180,7 @@ const LaborProfileFormComponent = ({
                       className="hidden"
                       onChange={(e) => {
                         const file = e.target.files?.[0];
-                        form.setValue('photo', e.target.files, { shouldValidate: true }); 
+                        form.setValue('photo', file, { shouldValidate: true }); 
                         if (file) {
                           const reader = new FileReader();
                           reader.onloadend = () => {
@@ -189,11 +189,12 @@ const LaborProfileFormComponent = ({
                           reader.readAsDataURL(file);
                         } else {
                           setPhotoPreviewUrl(existingProfile?.photo_url || null); 
+                          form.setValue('photo', undefined, { shouldValidate: true });
                         }
                       }}
                       ref={field.ref} 
-                      name={field.name} // Ensure name is passed for RHF
-                      onBlur={field.onBlur} // Ensure onBlur is passed for RHF
+                      name={field.name} 
+                      onBlur={field.onBlur} 
                       disabled={isSubmitting}
                     />
                     <FormLabel
