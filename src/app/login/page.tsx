@@ -168,8 +168,9 @@ export default function LoginPage() {
             </form>
           </Form>
         </CardContent>
-        <CardFooter className="text-center text-sm text-muted-foreground">
+        <CardFooter className="flex flex-col items-center text-center text-sm text-muted-foreground">
           <p>Manage your labor attendance efficiently.</p>
+          <p className="mt-2 text-xs">Made By Shaik Anisul Rahaman</p>
         </CardFooter>
       </Card>
     </div>
