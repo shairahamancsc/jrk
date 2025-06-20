@@ -35,10 +35,10 @@ const getPathFromUrl = (url: string): string | null => {
     if (bucketNameIndex !== -1 && bucketNameIndex + 1 < pathSegments.length) {
       return pathSegments.slice(bucketNameIndex + 1).join('/');
     }
-    console.warn("Could not derive storage path from URL:", url);
+    console.warn("[DataProvider] Could not derive storage path from URL:", url);
     return null;
   } catch (e) {
-    console.error("Error parsing URL for file path:", e, "URL:", url);
+    console.error("[DataProvider] Error parsing URL for file path:", e, "URL:", url);
     return null;
   }
 };
@@ -86,8 +86,6 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     
     if (error) {
         console.error(`[DataProvider] Error fetching labor profile by ID ${profileId}:`, error);
-        // PGRST116 means no rows found, which is a valid outcome for .single() if the ID is wrong or RLS prevents access.
-        // Only toast for other unexpected errors.
         if (error.code !== 'PGRST116') { 
              toast({ variant: "destructive", title: "Fetch Error", description: `Could not fetch profile: ${error.message}` });
         }
@@ -171,8 +169,17 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       });
 
     if (error) {
-      console.error('[DataProvider] Error uploading file:', error);
-      toast({ variant: "destructive", title: "Upload Error", description: `Could not upload ${file.name}: ${error.message}` });
+      console.error('[DataProvider] Error uploading file. Raw error object:', error);
+      try {
+        console.error('[DataProvider] Error uploading file (JSON.stringify):', JSON.stringify(error, null, 2));
+      } catch (e) {
+        console.error('[DataProvider] Could not stringify error object for upload:', e);
+      }
+      toast({ 
+        variant: "destructive", 
+        title: "Upload Error", 
+        description: `Could not upload ${file.name}. ${error.message || 'Please check storage permissions and browser console for details.'}` 
+      });
       return undefined;
     }
 
@@ -509,5 +516,7 @@ export const useData = () => {
   return context;
 };
 
+
+    
 
     
