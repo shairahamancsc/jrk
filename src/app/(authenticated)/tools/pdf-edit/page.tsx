@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { FilePenLine, UploadCloud, Wand2, FileText, Loader2, FileDown } from 'lucide-react';
+import { FilePenLine, UploadCloud, Wand2, FileText, Loader2, FileDown, Sparkles } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import { generatePdfPage } from '@/ai/flows/pdf-edit-flow';
@@ -151,6 +151,20 @@ export default function PdfEditPage() {
             rows={4}
             disabled={!file || isProcessing}
           />
+           <div className="mt-4">
+            <p className="text-sm text-muted-foreground mb-2 flex items-center gap-1"><Sparkles className="h-4 w-4 text-accent" />Or try one of these suggestions:</p>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" onClick={() => setPrompt('Add a new final page that summarizes this document in three paragraphs.')} disabled={!file || isProcessing}>
+                Summarize on new page
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setPrompt('Create a title page for this document. Include a suitable title and a brief, one-sentence subtitle.')} disabled={!file || isProcessing}>
+                Create title page
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setPrompt('Add a new page that lists the top 5 key takeaways from this document as a bulleted list.')} disabled={!file || isProcessing}>
+                List key takeaways
+              </Button>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
