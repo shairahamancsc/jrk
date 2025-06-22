@@ -1,4 +1,3 @@
-
 "use client";
 
 import Link from 'next/link';
@@ -9,7 +8,8 @@ import {
   CalendarCheck,
   LogOut,
   UserPlus, 
-  Banknote, // Added for Payment Reports
+  Banknote,
+  Wrench,
 } from 'lucide-react';
 import {
   SidebarMenu,
@@ -23,7 +23,8 @@ const navItemsBase = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/labor', label: 'Labor Profiles', icon: Users },
   { href: '/attendance', label: 'Daily Attendance', icon: CalendarCheck },
-  { href: '/payment-reports', label: 'Payment Reports', icon: Banknote }, // New item
+  { href: '/payment-reports', label: 'Payment Reports', icon: Banknote },
+  { href: '/tools', label: 'Tools', icon: Wrench },
 ];
 
 const adminNavItems = [
