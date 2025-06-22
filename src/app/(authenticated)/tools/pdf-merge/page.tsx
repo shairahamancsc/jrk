@@ -1,10 +1,32 @@
+
 "use client";
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Construction, GitMerge } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { useToast } from '@/hooks/use-toast';
+import { GitMerge, UploadCloud, X } from 'lucide-react';
 
 export default function PdfMergePage() {
+  const { toast } = useToast();
+  const [files, setFiles] = useState<File[]>([]);
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setFiles(prev => [...prev, ...Array.from(event.target.files || [])]);
+  };
+  
+  const removeFile = (index: number) => {
+    setFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleMerge = () => {
+    toast({
+      title: "Feature Coming Soon",
+      description: "The AI PDF Merger is currently under development.",
+    });
+  };
+
   return (
     <div className="space-y-8">
       <header className="space-y-2">
@@ -12,20 +34,62 @@ export default function PdfMergePage() {
           <GitMerge size={32} /> AI PDF Merger
         </h1>
         <p className="text-muted-foreground">
-          This feature is currently under development.
+          This feature is currently under development. Upload multiple PDFs to combine them.
         </p>
       </header>
 
       <Card className="shadow-lg">
-        <CardHeader className="flex-row items-center gap-4">
-           <Construction className="h-12 w-12 text-yellow-500" />
-           <div>
-            <CardTitle>Feature Coming Soon</CardTitle>
-            <CardDescription>We are working hard to bring you this feature.</CardDescription>
-           </div>
+        <CardHeader>
+          <CardTitle>1. Upload PDFs</CardTitle>
+          <CardDescription>Select two or more PDF files to merge.</CardDescription>
         </CardHeader>
         <CardContent>
-          <p>You will soon be able to combine multiple PDF files into one, with AI helping to intelligently order and format the final document.</p>
+           <div className="border-2 border-dashed border-muted-foreground/30 rounded-lg p-8 text-center bg-background/50">
+            <UploadCloud className="mx-auto h-12 w-12 text-muted-foreground" />
+            <p className="mt-4 text-muted-foreground">Drag & drop files here or click to browse</p>
+            <Input
+              id="file-upload"
+              type="file"
+              multiple
+              accept="application/pdf"
+              onChange={handleFileChange}
+              className="sr-only"
+            />
+             <Button asChild variant="outline" className="mt-4">
+                <label htmlFor="file-upload">Browse Files</label>
+            </Button>
+          </div>
+
+           {files.length > 0 && (
+            <div className="mt-6">
+              <h3 className="font-semibold mb-2">Selected Files ({files.length}):</h3>
+              <ul className="space-y-2">
+                {files.map((file, index) => (
+                  <li key={index} className="flex items-center justify-between p-2 border rounded-md">
+                    <span className="text-sm truncate">{file.name}</span>
+                     <button
+                      onClick={() => removeFile(index)}
+                      className="text-destructive hover:text-destructive/80"
+                    >
+                      <X size={16} />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="shadow-lg">
+        <CardHeader>
+          <CardTitle>2. Merge Files</CardTitle>
+          <CardDescription>AI will help intelligently order the merged document (feature coming soon).</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button onClick={handleMerge} disabled={files.length < 2}>
+            Merge PDFs
+          </Button>
         </CardContent>
       </Card>
     </div>

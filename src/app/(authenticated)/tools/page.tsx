@@ -1,8 +1,9 @@
+
 "use client";
 
 import React from 'react';
 import Link from 'next/link';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Wrench, FilePenLine, GitMerge, FileImage, Scissors, Images } from 'lucide-react';
 
 const tools = [
@@ -11,30 +12,35 @@ const tools = [
     description: 'Edit text, images, and links in your PDF files with AI assistance.',
     href: '/tools/pdf-edit',
     icon: FilePenLine,
+    status: 'Coming Soon',
   },
   {
     title: 'AI PDF Merger',
     description: 'Combine multiple PDF files into one, intelligently ordered by AI.',
     href: '/tools/pdf-merge',
     icon: GitMerge,
+    status: 'Coming Soon',
   },
   {
     title: 'PDF to JPG Converter',
     description: 'Convert each page of your PDF into high-quality JPG images.',
     href: '/tools/pdf-to-jpg',
     icon: FileImage,
+    status: 'Coming Soon',
   },
   {
     title: 'AI PDF Splitter',
     description: 'Split a single PDF into multiple files based on page ranges or AI-detected sections.',
     href: '/tools/pdf-split',
     icon: Scissors,
+    status: 'Coming Soon',
   },
   {
-    title: 'JPG to PDF Converter',
+    title: 'JPG/PNG to PDF Converter',
     description: 'Convert multiple JPG images into a single, organized PDF document.',
     href: '/tools/jpg-to-pdf',
     icon: Images,
+    status: 'Ready',
   },
 ];
 
@@ -60,9 +66,11 @@ export default function ToolsPage() {
                   </div>
                   <div className="flex flex-col">
                     <CardTitle>{tool.title}</CardTitle>
-                    <span className="text-xs font-semibold bg-accent/80 text-accent-foreground px-2 py-0.5 rounded-full w-fit">
-                        Coming Soon
-                    </span>
+                    {tool.status !== 'Ready' && (
+                       <span className="text-xs font-semibold bg-accent/80 text-accent-foreground px-2 py-0.5 rounded-full w-fit">
+                        {tool.status}
+                       </span>
+                    )}
                   </div>
               </CardHeader>
               <CardContent className="flex-grow">

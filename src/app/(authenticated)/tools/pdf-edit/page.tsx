@@ -1,10 +1,28 @@
+
 "use client";
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Construction, FilePenLine } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { useToast } from '@/hooks/use-toast';
+import { FilePenLine, UploadCloud } from 'lucide-react';
 
 export default function PdfEditPage() {
+  const { toast } = useToast();
+  const [file, setFile] = useState<File | null>(null);
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setFile(event.target.files?.[0] || null);
+  };
+  
+  const handleEdit = () => {
+    toast({
+      title: "Feature Coming Soon",
+      description: "The AI PDF Editor is currently under development.",
+    });
+  };
+
   return (
     <div className="space-y-8">
       <header className="space-y-2">
@@ -12,20 +30,42 @@ export default function PdfEditPage() {
           <FilePenLine size={32} /> AI PDF Editor
         </h1>
         <p className="text-muted-foreground">
-          This feature is currently under development.
+          This feature is currently under development. Upload a PDF to get started.
         </p>
       </header>
 
       <Card className="shadow-lg">
-        <CardHeader className="flex-row items-center gap-4">
-           <Construction className="h-12 w-12 text-yellow-500" />
-           <div>
-            <CardTitle>Feature Coming Soon</CardTitle>
-            <CardDescription>We are working hard to bring you an AI-powered PDF editing experience.</CardDescription>
-           </div>
+        <CardHeader>
+          <CardTitle>1. Upload PDF</CardTitle>
+          <CardDescription>Select the PDF file you wish to edit.</CardDescription>
         </CardHeader>
         <CardContent>
-          <p>You will soon be able to edit text, replace images, and modify your PDF documents directly in the browser with the help of AI.</p>
+          <div className="border-2 border-dashed border-muted-foreground/30 rounded-lg p-8 text-center bg-background/50">
+            <UploadCloud className="mx-auto h-12 w-12 text-muted-foreground" />
+            <p className="mt-4 text-muted-foreground">{file ? file.name : "Drag & drop file here or click to browse"}</p>
+            <Input
+              id="file-upload"
+              type="file"
+              accept="application/pdf"
+              onChange={handleFileChange}
+              className="sr-only"
+            />
+             <Button asChild variant="outline" className="mt-4">
+                <label htmlFor="file-upload">Browse File</label>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+      
+      <Card className="shadow-lg">
+        <CardHeader>
+          <CardTitle>2. Start Editing</CardTitle>
+          <CardDescription>Once uploaded, the editor will launch (feature coming soon).</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button onClick={handleEdit} disabled={!file}>
+            Begin Editing with AI
+          </Button>
         </CardContent>
       </Card>
     </div>
