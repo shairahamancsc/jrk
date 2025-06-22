@@ -12,7 +12,7 @@ const tools = [
     description: 'Edit text, images, and links in your PDF files with AI assistance.',
     href: '/tools/pdf-edit',
     icon: FilePenLine,
-    status: 'Coming Soon',
+    status: 'In Development',
   },
   {
     title: 'PDF Merger',
