@@ -5,19 +5,19 @@
  *
  * - generatePdfPage - A function that handles the content generation for a new PDF page.
  * - GeneratePdfPageInput - The input type for the flow.
- * - GeneratePdfPageOutput - The return type for the flow.
+ * - GeneratePdfPage-Output - The return type for the flow.
  */
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
-export const GeneratePdfPageInputSchema = z.object({
+const GeneratePdfPageInputSchema = z.object({
   pdfTextContent: z.string().describe('The extracted text content of the original PDF.'),
   userPrompt: z.string().describe("The user's instructions for what content to generate for the new page."),
 });
 export type GeneratePdfPageInput = z.infer<typeof GeneratePdfPageInputSchema>;
 
-export const GeneratePdfPageOutputSchema = z.object({
+const GeneratePdfPageOutputSchema = z.object({
   generatedText: z.string().describe('The AI-generated text to be placed on the new page.'),
 });
 export type GeneratePdfPageOutput = z.infer<typeof GeneratePdfPageOutputSchema>;
