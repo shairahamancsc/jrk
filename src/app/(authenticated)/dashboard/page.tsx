@@ -1,7 +1,6 @@
 
 "use client";
 
-import type { Metadata } from 'next';
 import React, { useMemo, useState, useEffect } from 'react';
 import { useData } from '@/contexts/data-context';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
@@ -14,10 +13,6 @@ import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Input } from '@/components/ui/input';
-
-export const metadata: Metadata = {
-  title: 'Dashboard',
-};
 
 export default function DashboardPage() {
   const { attendanceEntries, isLoading: dataLoading } = useData(); // laborProfiles not directly needed here if labor_name is on entry

@@ -1,7 +1,6 @@
 
 "use client";
 
-import type { Metadata } from 'next';
 import React, { useMemo, useState, useEffect } from 'react';
 import { AttendanceForm } from '@/components/attendance/attendance-form';
 import { useData } from '@/contexts/data-context';
@@ -11,10 +10,6 @@ import { Badge } from '@/components/ui/badge';
 import type { AttendanceEntry, AttendanceStatus } from '@/types';
 import { format, parseISO } from 'date-fns';
 import { ListOrdered, Loader2 } from 'lucide-react';
-
-export const metadata: Metadata = {
-  title: 'Daily Attendance',
-};
 
 export default function AttendancePage() {
   const { attendanceEntries, laborProfiles, isLoading: dataLoading } = useData(); // laborProfiles is needed by AttendanceForm

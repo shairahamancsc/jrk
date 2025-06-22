@@ -1,7 +1,6 @@
 
 "use client";
 
-import type { Metadata } from 'next';
 import React, { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -12,10 +11,6 @@ import { useToast } from '@/hooks/use-toast';
 import { FileImage, UploadCloud, Loader2, FileDown, Download, X } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
 import JSZip from 'jszip';
-
-export const metadata: Metadata = {
-  title: 'PDF to JPG Converter',
-};
 
 export default function PdfToJpgPage() {
   const { toast } = useToast();

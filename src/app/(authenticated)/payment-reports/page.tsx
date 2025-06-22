@@ -1,7 +1,6 @@
 
 "use client";
 
-import type { Metadata } from 'next';
 import React, { useState, useEffect } from 'react';
 import { useData } from '@/contexts/data-context';
 import { Button } from '@/components/ui/button';
@@ -21,10 +20,6 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { recordPaymentSchema, type RecordPaymentFormData } from '@/schemas/payment-schema';
 import { useToast } from '@/hooks/use-toast';
-
-export const metadata: Metadata = {
-  title: 'Payment Reports',
-};
 
 export default function PaymentReportsPage() {
   const { laborProfiles, attendanceEntries, isLoading: dataContextLoading, addPaymentHistoryEntry } = useData();

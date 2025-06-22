@@ -1,7 +1,6 @@
 
 "use client";
 
-import type { Metadata } from 'next';
 import React, { useState, useEffect, useCallback } from 'react';
 import { LaborProfileForm } from '@/components/labor/labor-profile-form';
 import { useData } from '@/contexts/data-context';
@@ -39,10 +38,6 @@ import { format, parseISO } from 'date-fns';
 import type { LaborProfile } from '@/types';
 import { useToast } from "@/hooks/use-toast";
 import { cn } from '@/lib/utils';
-
-export const metadata: Metadata = {
-  title: 'Manage Labor Profiles',
-};
 
 export default function LaborPage() {
   const { laborProfiles, isLoading: dataLoading, deleteLaborProfile } = useData();

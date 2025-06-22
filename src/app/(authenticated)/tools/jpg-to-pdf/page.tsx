@@ -1,7 +1,6 @@
 
 "use client";
 
-import type { Metadata } from 'next';
 import React, { useState, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,10 +12,6 @@ import Image from 'next/image';
 
 const MAX_FILES = 20;
 const MAX_FILE_SIZE_MB = 5;
-
-export const metadata: Metadata = {
-  title: 'JPG/PNG to PDF Converter',
-};
 
 export default function JpgToPdfPage() {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
