@@ -1,6 +1,7 @@
 
 "use client";
 
+import type { Metadata } from 'next';
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -16,6 +17,11 @@ import { useToast } from "@/hooks/use-toast";
 
 // TODO: If using hCaptcha, uncomment and install:
 // import HCaptcha from '@hcaptcha/react-hcaptcha';
+
+export const metadata: Metadata = {
+  title: 'Admin Login',
+  description: 'Log in to the JRKE Attendance portal to manage labor profiles, track daily attendance, and generate payment reports.',
+};
 
 export default function LoginPage() {
   const { login, isLoading: authLoading } = useAuth();

@@ -1,6 +1,7 @@
 
 "use client";
 
+import type { Metadata } from 'next';
 import React, { useState, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,6 +11,10 @@ import { GitMerge, UploadCloud, X, Loader2, FileDown } from 'lucide-react';
 import { PDFDocument } from 'pdf-lib';
 
 const MAX_FILES = 20;
+
+export const metadata: Metadata = {
+  title: 'PDF Merger',
+};
 
 export default function PdfMergePage() {
   const { toast } = useToast();

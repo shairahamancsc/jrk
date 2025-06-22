@@ -1,6 +1,7 @@
 
 "use client";
 
+import type { Metadata } from 'next';
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,6 +12,10 @@ import { FilePenLine, UploadCloud, Wand2, FileText, Loader2, FileDown, Sparkles 
 import * as pdfjsLib from 'pdfjs-dist';
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import { generatePdfPage } from '@/ai/flows/pdf-edit-flow';
+
+export const metadata: Metadata = {
+  title: 'AI PDF Editor',
+};
 
 export default function PdfEditPage() {
   const { toast } = useToast();

@@ -1,6 +1,7 @@
 
 "use client";
 
+import type { Metadata } from 'next';
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -12,6 +13,10 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Eye, EyeOff, UserPlus, Loader2 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from '@/lib/supabase/client'; // Ensure Supabase client is imported
+
+export const metadata: Metadata = {
+  title: 'Add Supervisor',
+};
 
 export default function AddSupervisorPage() {
   const { toast } = useToast();

@@ -1,10 +1,15 @@
 
 "use client";
 
+import type { Metadata } from 'next';
 import React from 'react';
 import Link from 'next/link';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Wrench, FilePenLine, GitMerge, FileImage, Scissors, Images } from 'lucide-react';
+
+export const metadata: Metadata = {
+  title: 'Productivity Tools',
+};
 
 const tools = [
   {

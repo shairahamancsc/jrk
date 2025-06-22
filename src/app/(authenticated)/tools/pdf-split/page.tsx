@@ -1,6 +1,7 @@
 
 "use client";
 
+import type { Metadata } from 'next';
 import React, { useState, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,6 +9,10 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { Scissors, UploadCloud, Loader2, FileDown } from 'lucide-react';
 import { PDFDocument } from 'pdf-lib';
+
+export const metadata: Metadata = {
+  title: 'PDF Splitter',
+};
 
 export default function PdfSplitPage() {
   const { toast } = useToast();

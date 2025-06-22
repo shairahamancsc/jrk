@@ -17,8 +17,11 @@ const roboto = Roboto({
 });
 
 export const metadata: Metadata = {
-  title: 'JRKE Attendance MVP',
-  description: 'Labor attendance management application',
+  title: {
+    template: '%s | JRKE Attendance MVP',
+    default: 'JRKE Attendance MVP',
+  },
+  description: 'An AI-powered application for labor attendance tracking, payment reporting, and document management.',
 };
 
 export default function RootLayout({

@@ -1,6 +1,7 @@
 
 "use client";
 
+import type { Metadata } from 'next';
 import React, { useState, useEffect } from 'react';
 import { useData } from '@/contexts/data-context';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
@@ -9,6 +10,11 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { FileText, UserCircle2, Users, Loader2, WalletCards } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import Image from 'next/image';
+
+export const metadata: Metadata = {
+  title: 'All Labor Profiles',
+  description: 'Browse the public directory of all registered labor profiles in the JRKE Attendance system.',
+};
 
 export default function AllLaborPage() {
   const { laborProfiles, isLoading: dataLoading } = useData();

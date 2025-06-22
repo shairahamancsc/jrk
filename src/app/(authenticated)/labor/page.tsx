@@ -1,6 +1,7 @@
 
 "use client";
 
+import type { Metadata } from 'next';
 import React, { useState, useEffect, useCallback } from 'react';
 import { LaborProfileForm } from '@/components/labor/labor-profile-form';
 import { useData } from '@/contexts/data-context';
@@ -38,6 +39,10 @@ import { format, parseISO } from 'date-fns';
 import type { LaborProfile } from '@/types';
 import { useToast } from "@/hooks/use-toast";
 import { cn } from '@/lib/utils';
+
+export const metadata: Metadata = {
+  title: 'Manage Labor Profiles',
+};
 
 export default function LaborPage() {
   const { laborProfiles, isLoading: dataLoading, deleteLaborProfile } = useData();
@@ -249,7 +254,7 @@ export default function LaborPage() {
               <p><strong>Aadhaar Number:</strong> {selectedProfile.aadhaar_number || 'N/A'}</p>
               <p><strong>PAN Number:</strong> {selectedProfile.pan_number || 'N/A'}</p>
               <p><strong>Photo:</strong></p>
-              {selectedProfile.photo_url && <img src={getAvatarSrc(selectedProfile.photo_url)} alt="Profile" className="rounded-md max-h-40 sm:max-h-48 mx-auto sm:mx-0" data-ai-hint="profile person"/>}
+              {selectedProfile.photo_url && <img src={getAvatarSrc(selectedProfile.photo_url)} alt={selectedProfile.name} className="rounded-md max-h-40 sm:max-h-48 mx-auto sm:mx-0" data-ai-hint="profile person"/>}
               <p><strong>Aadhaar Document:</strong> {getFileDisplay(selectedProfile.aadhaar_url)}</p>
               <p><strong>PAN Document:</strong> {getFileDisplay(selectedProfile.pan_url)}</p>
               <p><strong>License Document:</strong> {getFileDisplay(selectedProfile.driving_license_url)}</p>
