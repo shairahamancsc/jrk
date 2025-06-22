@@ -15,25 +15,25 @@ const tools = [
     status: 'Coming Soon',
   },
   {
-    title: 'AI PDF Merger',
-    description: 'Combine multiple PDF files into one, intelligently ordered by AI.',
+    title: 'PDF Merger',
+    description: 'Combine multiple PDF files into one, merged in the order they are listed.',
     href: '/tools/pdf-merge',
     icon: GitMerge,
-    status: 'Coming Soon',
+    status: 'Ready',
   },
   {
     title: 'PDF to JPG Converter',
     description: 'Convert each page of your PDF into high-quality JPG images.',
     href: '/tools/pdf-to-jpg',
     icon: FileImage,
-    status: 'Coming Soon',
+    status: 'Ready',
   },
   {
-    title: 'AI PDF Splitter',
-    description: 'Split a single PDF into multiple files based on page ranges or AI-detected sections.',
+    title: 'PDF Splitter',
+    description: 'Split a single PDF into multiple files based on page ranges or sections.',
     href: '/tools/pdf-split',
     icon: Scissors,
-    status: 'Coming Soon',
+    status: 'Ready',
   },
   {
     title: 'JPG/PNG to PDF Converter',
@@ -66,8 +66,12 @@ export default function ToolsPage() {
                   </div>
                   <div className="flex flex-col">
                     <CardTitle>{tool.title}</CardTitle>
-                    {tool.status !== 'Ready' && (
+                    {tool.status !== 'Ready' ? (
                        <span className="text-xs font-semibold bg-accent/80 text-accent-foreground px-2 py-0.5 rounded-full w-fit">
+                        {tool.status}
+                       </span>
+                    ) : (
+                       <span className="text-xs font-semibold bg-primary/80 text-primary-foreground px-2 py-0.5 rounded-full w-fit">
                         {tool.status}
                        </span>
                     )}
