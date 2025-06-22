@@ -64,7 +64,7 @@ export default function PdfEditPage() {
       const { generatedText } = response;
       
       // 3. Use pdf-lib to add the new page
-      const pdfDoc = await PDFDocument.load(arrayBuffer);
+      const pdfDoc = await PDFDocument.load(await file.arrayBuffer());
       const helveticaFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
       const newPage = pdfDoc.addPage();
       const { width, height } = newPage.getSize();
