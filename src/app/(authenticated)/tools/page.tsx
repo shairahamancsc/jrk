@@ -8,13 +8,6 @@ import { Wrench, FilePenLine, GitMerge, FileImage, Scissors, Images } from 'luci
 
 const tools = [
   {
-    title: 'AI PDF Editor',
-    description: 'Add new pages with AI-generated content to your PDF files.',
-    href: '/tools/pdf-edit',
-    icon: FilePenLine,
-    status: 'Ready',
-  },
-  {
     title: 'PDF Merger',
     description: 'Combine multiple PDF files into one, merged in the order they are listed.',
     href: '/tools/pdf-merge',
