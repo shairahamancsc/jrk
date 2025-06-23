@@ -9,8 +9,18 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { FilePenLine, UploadCloud, Wand2, FileText, Loader2, FileDown, Sparkles } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
+import type { TextItem } from 'pdfjs-dist/types/src/display/api';
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
-import { generatePdfPage } from '@/ai/flows/pdf-edit-flow';
+import { modifyPdf } from '@/ai/flows/pdf-edit-flow';
+
+// Structure to hold text content with its coordinates
+interface PdfTextItem {
+  text: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
 
 export default function PdfEditPage() {
   const { toast } = useToast();
@@ -33,7 +43,7 @@ export default function PdfEditPage() {
       toast({
         variant: 'destructive',
         title: 'Missing Information',
-        description: 'Please upload a PDF and describe the page you want to add.',
+        description: 'Please upload a PDF and describe the edits you want to make.',
       });
       return;
     }
@@ -42,53 +52,92 @@ export default function PdfEditPage() {
     setEditedPdfUrl(null);
 
     try {
-      // 1. Extract text from PDF for context
+      // 1. Load PDF and extract text with coordinates
       const arrayBuffer = await file.arrayBuffer();
       const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
       const pdf = await loadingTask.promise;
-      let fullText = '';
-      for (let i = 1; i <= pdf.numPages; i++) {
-        const page = await pdf.getPage(i);
-        const textContent = await page.getTextContent();
-        const pageText = textContent.items.map(item => ('str' in item ? item.str : '')).join(' ');
-        fullText += pageText + '\n\n';
-      }
       
-      toast({ title: 'Processing...', description: 'AI is generating the new page content.' });
+      let fullText = '';
+      const allTextItems: PdfTextItem[] = [];
+      const pdfPage = await pdf.getPage(1); // For now, we only process the first page
+      const viewport = pdfPage.getViewport({ scale: 1.0 });
+      const textContent = await pdfPage.getTextContent();
+      
+      textContent.items.forEach(item => {
+        if ('str' in item) {
+          fullText += item.str + ' ';
+          const tx = pdfjsLib.Util.transform(viewport.transform, item.transform);
+          allTextItems.push({
+            text: item.str,
+            x: tx[4],
+            y: tx[5],
+            width: item.width,
+            height: item.height,
+          });
+        }
+      });
+      
+      toast({ title: 'Processing...', description: 'AI is analyzing your document and request.' });
 
-      // 2. Call Genkit flow to get new page content
-      const response = await generatePdfPage({
+      // 2. Call Genkit flow to get the modification plan
+      const response = await modifyPdf({
         pdfTextContent: fullText,
         userPrompt: prompt,
       });
-      const { generatedText } = response;
-      
-      // 3. Use pdf-lib to add the new page
+
+      // 3. Use pdf-lib to apply the modifications
       const pdfDoc = await PDFDocument.load(await file.arrayBuffer());
-      const helveticaFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
-      const newPage = pdfDoc.addPage();
-      const { width, height } = newPage.getSize();
+      const pageToModify = pdfDoc.getPage(0); // pdf-lib is 0-indexed
+      const { height: pageHeight } = pageToModify.getSize();
       
-      newPage.drawText(generatedText, {
-        x: 50,
-        y: height - 50,
-        font: helveticaFont,
-        size: 12,
-        color: rgb(0, 0, 0),
-        maxWidth: width - 100,
-        lineHeight: 18,
-      });
+      switch (response.action) {
+        case 'ADD_PAGE':
+          const helveticaFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
+          const newPage = pdfDoc.addPage();
+          const { width, height } = newPage.getSize();
+          
+          newPage.drawText(response.generatedText || '', {
+            x: 50,
+            y: height - 50,
+            font: helveticaFont,
+            size: 12,
+            color: rgb(0, 0, 0),
+            maxWidth: width - 100,
+            lineHeight: 18,
+          });
+          toast({ title: 'Success!', description: 'A new page has been added as requested.' });
+          break;
+
+        case 'REDACT_CONTENT':
+          if (response.redactions && response.redactions.length > 0) {
+            response.redactions.forEach(textToRedact => {
+              const itemsToRedact = allTextItems.filter(item => textToRedact.includes(item.text));
+              itemsToRedact.forEach(item => {
+                pageToModify.drawRectangle({
+                  x: item.x,
+                  y: pageHeight - item.y - item.height, // pdf-lib y-coord is from bottom
+                  width: item.width,
+                  height: item.height,
+                  color: rgb(1, 1, 1), // White
+                });
+              });
+            });
+             toast({ title: 'Success!', description: 'Content has been redacted as requested.' });
+          } else {
+             toast({ title: 'No action taken', description: 'The AI did not find any content to redact based on your prompt.' });
+          }
+          break;
+        
+        default:
+          toast({ variant: 'destructive', title: 'Unknown Action', description: 'The AI returned an unknown action.' });
+          break;
+      }
 
       // 4. Save the modified PDF and create a download URL
       const pdfBytes = await pdfDoc.save();
       const blob = new Blob([pdfBytes], { type: 'application/pdf' });
       const url = URL.createObjectURL(blob);
       setEditedPdfUrl(url);
-
-      toast({
-        title: 'Success!',
-        description: 'Your edited PDF is ready for download.',
-      });
 
     } catch (error) {
       console.error('AI PDF Edit Error:', error);
@@ -109,14 +158,14 @@ export default function PdfEditPage() {
           <FilePenLine size={32} /> AI PDF Editor
         </h1>
         <p className="text-muted-foreground">
-          Use natural language to add new pages to your PDF. The AI will generate the content.
+          Use natural language to add new pages or redact content from your PDF.
         </p>
       </header>
 
       <Card className="shadow-lg">
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><FileText className="h-5 w-5"/>1. Upload PDF</CardTitle>
-          <CardDescription>Select the PDF file you wish to edit.</CardDescription>
+          <CardDescription>Select the PDF file you wish to edit (AI currently processes the first page for redaction).</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="border-2 border-dashed border-muted-foreground/30 rounded-lg p-8 text-center bg-background/50">
@@ -138,14 +187,14 @@ export default function PdfEditPage() {
       
       <Card className="shadow-lg">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2"><Wand2 className="h-5 w-5"/>2. Describe The Page to Add</CardTitle>
+          <CardTitle className="flex items-center gap-2"><Wand2 className="h-5 w-5"/>2. Describe Your Desired Edits</CardTitle>
           <CardDescription>
-            Tell the AI what content to generate for the new page. For example: "Add a new final page summarizing this document."
+            Tell the AI what to do. For example: "Redact my address" or "Add a summary page."
           </CardDescription>
         </CardHeader>
         <CardContent>
           <Textarea
-            placeholder="e.g., Add a new page with a three-paragraph conclusion..."
+            placeholder="e.g., Redact the enrollment number and the download date..."
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             rows={4}
@@ -154,14 +203,14 @@ export default function PdfEditPage() {
            <div className="mt-4">
             <p className="text-sm text-muted-foreground mb-2 flex items-center gap-1"><Sparkles className="h-4 w-4 text-accent" />Or try one of these suggestions:</p>
             <div className="flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" onClick={() => setPrompt('Redact the name and address from this document.')} disabled={!file || isProcessing}>
+                Redact personal info
+              </Button>
               <Button variant="outline" size="sm" onClick={() => setPrompt('Add a new final page that summarizes this document in three paragraphs.')} disabled={!file || isProcessing}>
                 Summarize on new page
               </Button>
               <Button variant="outline" size="sm" onClick={() => setPrompt('Create a title page for this document. Include a suitable title and a brief, one-sentence subtitle.')} disabled={!file || isProcessing}>
                 Create title page
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => setPrompt('Add a new page that lists the top 5 key takeaways from this document as a bulleted list.')} disabled={!file || isProcessing}>
-                List key takeaways
               </Button>
             </div>
           </div>
