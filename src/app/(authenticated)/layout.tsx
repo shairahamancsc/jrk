@@ -15,8 +15,9 @@ import {
   SidebarInset,
 } from '@/components/ui/sidebar';
 import { SidebarNavItems } from '@/components/shared/sidebar-nav-items';
-import { ThemeToggle } from '@/components/shared/theme-toggle'; // Import ThemeToggle
+import { ThemeToggle } from '@/components/shared/theme-toggle';
 import { Building2, Loader2 } from 'lucide-react';
+import Breadcrumbs from '@/components/shared/breadcrumbs';
 
 export default function AuthenticatedLayout({ children }: { children: ReactNode }) {
   const { isAuthenticated, isLoading, user, userRole } = useAuth(); 
@@ -86,6 +87,7 @@ export default function AuthenticatedLayout({ children }: { children: ReactNode 
           </div>
         </header>
         <main className="flex-1 p-4 md:p-6 lg:p-8 animate-fadeInPage">
+          <Breadcrumbs />
           {children}
         </main>
       </SidebarInset>
