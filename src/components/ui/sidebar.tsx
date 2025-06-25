@@ -508,7 +508,7 @@ const SidebarMenuItem = React.forwardRef<
 SidebarMenuItem.displayName = "SidebarMenuItem"
 
 const sidebarMenuButtonVariants = cva(
-  "peer/menu-button flex w-full items-center gap-2 overflow-hidden rounded-md p-2 text-left text-sm outline-none ring-sidebar-ring transition-[width,height,padding] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 group-has-[[data-sidebar=menu-action]]/menu-item:pr-8 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[active=true]:bg-sidebar-accent data-[active=true]:font-medium data-[active=true]:text-sidebar-accent-foreground data-[state=open]:hover:bg-sidebar-accent data-[state=open]:hover:text-sidebar-accent-foreground group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:!size-auto group-data-[collapsible=icon]:!p-0 group-data-[collapsible=icon]:!w-auto group-data-[collapsible=icon]:aspect-square [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0",
+  "peer/menu-button flex w-full items-center gap-2 overflow-hidden rounded-md p-2 text-left text-sm outline-none ring-sidebar-ring transition-colors duration-200 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 group-has-[[data-sidebar=menu-action]]/menu-item:pr-8 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[active=true]:bg-sidebar-accent data-[active=true]:font-medium data-[active=true]:text-sidebar-accent-foreground data-[state=open]:hover:bg-sidebar-accent data-[state=open]:hover:text-sidebar-accent-foreground group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:!size-8 group-data-[collapsible=icon]:p-2 [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0",
   {
     variants: {
       variant: {
@@ -517,7 +517,7 @@ const sidebarMenuButtonVariants = cva(
           "bg-background shadow-[0_0_0_1px_hsl(var(--sidebar-border))] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground hover:shadow-[0_0_0_1px_hsl(var(--sidebar-accent))]",
       },
       size: {
-        default: "h-8 text-sm", // Will be overridden by custom CSS for collapsed state
+        default: "h-8 text-sm",
         sm: "h-7 text-xs",
         lg: "h-12 text-sm",
       },
@@ -545,7 +545,7 @@ const SidebarMenuButton = React.forwardRef<
       size = "default",
       tooltip,
       className,
-      children, // Capture children
+      children,
       ...props
     },
     ref
@@ -553,98 +553,70 @@ const SidebarMenuButton = React.forwardRef<
     const Comp = asChild ? Slot : "button"
     const { isMobile, state } = useSidebar()
 
-    // Logic to prepare icon and title for the fancy hover effect,
-    // primarily for the asChild=false case.
-    let iconNode: React.ReactNode = null;
-    let titleNode: React.ReactNode = null;
-
-    if (!asChild) { // This block is for when Comp is 'button'
-        if (React.Children.count(children) === 2) {
-            const childArray = React.Children.toArray(children);
-            iconNode = childArray[0];
-            titleNode = childArray[1];
-        } else if (React.Children.count(children) === 1 && typeof children !== 'string') {
-            iconNode = children;
-        }
-    }
-    // When asChild is true, props.children (e.g., <Link><Icon/><span>Title</span></Link>) is passed directly to Slot.
-    // The fancy hover CSS will need to target svg/span inside the Link for that case.
-    
-    const buttonVisualContent = !asChild ? (
-      // Use a div wrapper instead of React.Fragment, styled to be layout-neutral.
-      // This div is the direct child of the <button> element.
-      <div style={{ display: 'contents' }}> 
-        {iconNode && <div className="button-icon-wrapper">{iconNode}</div>}
-        {titleNode && <div className="button-title-wrapper">{titleNode}</div>}
-        {/* Fallback if iconNode/titleNode couldn't be determined for asChild=false */}
-        {!iconNode && !titleNode && children} 
-      </div>
-    ) : children; // For asChild=true, pass original children to Slot
-
-
-    const buttonClasses = cn(
-      sidebarMenuButtonVariants({ variant, size }),
-      "group-data-[collapsible=icon]:fancy-hover-button", 
-      className
-    );
-
-
     const buttonElement = (
       <Comp
         ref={ref}
         data-sidebar="menu-button"
         data-size={size}
         data-active={isActive}
-        className={buttonClasses}
+        className={cn(sidebarMenuButtonVariants({ variant, size }), className)}
         {...props}
       >
-        {buttonVisualContent}
+        {children}
       </Comp>
     )
 
-    if (!tooltip || (state === "expanded" && !isMobile)) { 
+    if (!tooltip || (state === "expanded" && !isMobile)) {
       return buttonElement
     }
-    
-    // Prepare tooltip content
-    let tooltipContentValue: React.ReactNode;
-    if (state === "collapsed" && !isMobile ) {
-        // Attempt to get title text from children for tooltip if not explicitly provided
-        // This is a heuristic and might need refinement based on actual children structure.
-        let potentialTitleText = "";
-        if (asChild) {
-            // If asChild, children is likely <Link><Icon/><span>Title Text</span></Link>
-            // Try to find a span within props.children (the Link)
-            React.Children.forEach(props.children, (child) => {
-                if (React.isValidElement(child) && child.type === 'a' && child.props.children) { // Assuming Link renders an <a>
-                     React.Children.forEach(child.props.children, (innerChild) => {
-                        if (React.isValidElement(innerChild) && innerChild.type === 'span') {
-                            potentialTitleText = innerChild.props.children as string;
-                        }
-                     });
-                }
-            });
-        } else if (titleNode && React.isValidElement(titleNode) && titleNode.type === 'span') {
-            // If not asChild, and we extracted titleNode as a span
-            potentialTitleText = titleNode.props.children as string;
-        }
-        
-        tooltipContentValue = (typeof tooltip === 'string' ? tooltip : potentialTitleText) || "Menu Item";
-    } else {
-        tooltipContentValue = typeof tooltip === 'string' ? tooltip : "Menu Item";
-    }
-    
-    const tooltipProps = typeof tooltip === 'object' ? tooltip : { children: tooltipContentValue, className: "bg-primary text-primary-foreground" };
 
+    // Prepare tooltip content
+    let tooltipContentValue: React.ReactNode
+    if (state === "collapsed" && !isMobile) {
+      // Attempt to get title text from children for tooltip if not explicitly provided
+      // This is a heuristic and might need refinement based on actual children structure.
+      let potentialTitleText = ""
+      if (asChild) {
+        // If asChild, children is likely <Link><Icon/><span>Title Text</span></Link>
+        // Try to find a span within props.children (the Link)
+        React.Children.forEach(props.children, (child) => {
+          if (React.isValidElement(child) && child.type === "a" && child.props.children) {
+            // Assuming Link renders an <a>
+            React.Children.forEach(child.props.children, (innerChild) => {
+              if (React.isValidElement(innerChild) && innerChild.type === "span") {
+                potentialTitleText = innerChild.props.children as string
+              }
+            })
+          }
+        })
+      } else if (children) {
+        const childArray = React.Children.toArray(children)
+        const spanChild = childArray.find(
+          (c) => React.isValidElement(c) && c.type === "span"
+        )
+        if (spanChild && React.isValidElement(spanChild)) {
+          potentialTitleText = spanChild.props.children as string
+        }
+      }
+
+      tooltipContentValue =
+        (typeof tooltip === "string" ? tooltip : potentialTitleText) || "Menu Item"
+    } else {
+      tooltipContentValue = typeof tooltip === "string" ? tooltip : "Menu Item"
+    }
+
+    const tooltipProps =
+      typeof tooltip === "object"
+        ? tooltip
+        : {
+            children: tooltipContentValue,
+            className: "bg-primary text-primary-foreground",
+          }
 
     return (
       <Tooltip>
         <TooltipTrigger asChild>{buttonElement}</TooltipTrigger>
-        <TooltipContent
-          side="right"
-          align="center"
-          {...tooltipProps}
-        />
+        <TooltipContent side="right" align="center" {...tooltipProps} />
       </Tooltip>
     )
   }
