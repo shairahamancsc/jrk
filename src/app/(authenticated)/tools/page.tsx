@@ -8,8 +8,8 @@ import { Wrench, FilePenLine, GitMerge, FileImage, Scissors, Images } from 'luci
 
 const tools = [
   {
-    title: 'AI PDF Editor',
-    description: 'Use AI to redact content or add new pages to your PDF.',
+    title: 'PDF Editor',
+    description: 'Manually edit your PDF. Add text, images, or whiteout content.',
     href: '/tools/pdf-edit',
     icon: FilePenLine,
     status: 'Ready',
@@ -52,7 +52,7 @@ export default function ToolsPage() {
           <Wrench size={32} /> Productivity Tools
         </h1>
         <p className="text-muted-foreground">
-          A suite of AI-integrated tools to help you manage your documents.
+          A suite of tools to help you manage your documents.
         </p>
       </header>
 

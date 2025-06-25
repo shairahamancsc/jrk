@@ -6,23 +6,34 @@ import Image from 'next/image';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { FilePenLine, UploadCloud, Loader2, FileDown, Sparkles } from 'lucide-react';
+import { FilePenLine, UploadCloud, Loader2, FileDown, Eraser, Trash2 } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
-import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
-import { modifyPdf } from '@/ai/flows/pdf-edit-flow';
+import { PDFDocument, rgb } from 'pdf-lib';
+
+type Redaction = {
+  id: string;
+  pageIndex: number;
+  x: number; // Stored as PDF coordinates (from bottom-left)
+  y: number; // Stored as PDF coordinates (from bottom-left)
+  width: number; // Stored as PDF units
+  height: number; // Stored as PDF units
+};
+
+type PageInfo = {
+  previewUrl: string;
+  width: number; // original PDF page width
+  height: number; // original PDF page height
+};
 
 export default function PdfEditPage() {
   const { toast } = useToast();
   
   const [file, setFile] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [isApplyingChanges, setIsApplyingChanges] = useState(false);
   
-  const [pagePreviews, setPagePreviews] = useState<string[]>([]);
-  const [pdfTextContent, setPdfTextContent] = useState<string>('');
-  const [userPrompt, setUserPrompt] = useState('');
+  const [pageInfos, setPageInfos] = useState<PageInfo[]>([]);
+  const [redactions, setRedactions] = useState<Redaction[]>([]);
   const [editedPdfUrl, setEditedPdfUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -32,10 +43,9 @@ export default function PdfEditPage() {
   const resetState = () => {
     setFile(null);
     setIsProcessing(false);
-    setIsApplyingChanges(false);
-    setPagePreviews([]);
-    setPdfTextContent('');
-    setUserPrompt('');
+    pageInfos.forEach(p => URL.revokeObjectURL(p.previewUrl));
+    setPageInfos([]);
+    setRedactions([]);
     if (editedPdfUrl) {
       URL.revokeObjectURL(editedPdfUrl);
     }
@@ -59,30 +69,27 @@ export default function PdfEditPage() {
       const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
       const pdf = await loadingTask.promise;
       
-      const previews: string[] = [];
-      let fullText = '';
+      const newPageInfos: PageInfo[] = [];
       for (let i = 1; i <= pdf.numPages; i++) {
         const page = await pdf.getPage(i);
-        
-        // Render preview
         const viewport = page.getViewport({ scale: 1.5 });
+        
         const canvas = document.createElement('canvas');
         const context = canvas.getContext('2d');
         canvas.height = viewport.height;
         canvas.width = viewport.width;
+        
         if (context) {
           await page.render({ canvasContext: context, viewport: viewport }).promise;
-          previews.push(canvas.toDataURL('image/jpeg'));
+          newPageInfos.push({
+            previewUrl: canvas.toDataURL('image/jpeg'),
+            width: page.view[2], // Original width
+            height: page.view[3], // Original height
+          });
         }
-
-        // Extract text
-        const textContent = await page.getTextContent();
-        fullText += textContent.items.map(item => 'str' in item ? item.str : '').join(' ') + '\n\n';
       }
-      setPagePreviews(previews);
-      setPdfTextContent(fullText);
-
-      toast({ title: "PDF Loaded", description: `Found ${pdf.numPages} page(s). You can now provide editing instructions.`});
+      setPageInfos(newPageInfos);
+      toast({ title: "PDF Loaded", description: `Found ${pdf.numPages} page(s). Click on a page to add a whiteout box.`});
 
     } catch (error) {
       console.error('Error processing PDF:', error);
@@ -92,91 +99,97 @@ export default function PdfEditPage() {
       setIsProcessing(false);
     }
   };
+  
+  const handleAddRedaction = (pageIndex: number, event: React.MouseEvent<HTMLDivElement>) => {
+    const pageInfo = pageInfos[pageIndex];
+    if (!pageInfo) return;
+
+    const target = event.currentTarget;
+    const rect = target.getBoundingClientRect();
+    const renderedWidth = target.clientWidth;
+    const renderedHeight = target.clientHeight;
+    
+    // Position of click relative to the image
+    const clickX = event.clientX - rect.left;
+    const clickY = event.clientY - rect.top;
+
+    // Scale factors
+    const scaleX = pageInfo.width / renderedWidth;
+    const scaleY = pageInfo.height / renderedHeight;
+    
+    const redactionWidth = 150; // Width in PDF units
+    const redactionHeight = 30; // Height in PDF units
+
+    // Convert click coordinates to PDF coordinates (origin at bottom-left)
+    const pdfX = clickX * scaleX - (redactionWidth / 2);
+    const pdfY = pageInfo.height - (clickY * scaleY) - (redactionHeight / 2);
+    
+    const newRedaction: Redaction = {
+      id: `redact-${Date.now()}`,
+      pageIndex,
+      x: pdfX,
+      y: pdfY,
+      width: redactionWidth,
+      height: redactionHeight,
+    };
+    
+    setRedactions(prev => [...prev, newRedaction]);
+  };
+  
+  const handleRemoveRedaction = (idToRemove: string) => {
+    setRedactions(prev => prev.filter(r => r.id !== idToRemove));
+  };
+
 
   const handleApplyChanges = async () => {
-    if (!file || !userPrompt || !pdfTextContent) {
-        toast({ variant: 'destructive', title: 'Missing Information', description: 'Please upload a PDF and provide instructions.' });
+    if (!file || redactions.length === 0) {
+        toast({ variant: 'destructive', title: 'No Changes to Apply', description: 'Please add at least one whiteout box to the PDF.' });
         return;
     }
-    setIsApplyingChanges(true);
+    setIsProcessing(true);
     if (editedPdfUrl) URL.revokeObjectURL(editedPdfUrl);
     setEditedPdfUrl(null);
 
     try {
-        const aiResult = await modifyPdf({
-            pdfTextContent: pdfTextContent,
-            userPrompt: userPrompt,
-        });
-
         const pdfBytes = await file.arrayBuffer();
         const pdfDoc = await PDFDocument.load(pdfBytes);
+        const pages = pdfDoc.getPages();
 
-        if (aiResult.action === 'ADD_PAGE' && aiResult.generatedText) {
-            const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-            const newPage = pdfDoc.addPage();
-            const { width, height } = newPage.getSize();
-            newPage.drawText(aiResult.generatedText, {
-                x: 50,
-                y: height - 50,
-                font,
-                size: 12,
-                lineHeight: 14,
-                maxWidth: width - 100,
+        redactions.forEach(r => {
+          if (pages[r.pageIndex]) {
+            pages[r.pageIndex].drawRectangle({
+              x: r.x,
+              y: r.y,
+              width: r.width,
+              height: r.height,
+              color: rgb(1, 1, 1), // Whiteout
+              borderColor: rgb(0.8, 0.8, 0.8), // Light grey border for visibility
+              borderWidth: 1,
             });
-            toast({ title: 'Page Added', description: 'A new page has been added with the AI-generated content.' });
-        } else if (aiResult.action === 'REDACT_CONTENT' && aiResult.redactions?.length) {
-            const pages = pdfDoc.getPages();
-            const font = await pdfDoc.embedFont(StandardFonts.Helvetica); // Need a font to get text width
-            let redactionCount = 0;
-
-            for (const page of pages) {
-                for (const textToRedact of aiResult.redactions) {
-                    const textInstances = await page.findText(textToRedact, { font });
-                    
-                    textInstances.forEach(instance => {
-                        page.drawRectangle({
-                            ...instance,
-                            color: rgb(1, 1, 1), // Whiteout
-                            borderColor: rgb(0.8, 0.8, 0.8), // Light grey border
-                            borderWidth: 1,
-                        });
-                        redactionCount++;
-                    });
-                }
-            }
-            toast({ title: 'Content Redacted', description: `Applied ${redactionCount} redaction(s) to the document.` });
-        } else {
-             toast({ variant: 'destructive', title: 'No Action Taken', description: "The AI could not determine a clear action from your prompt." });
-             setIsApplyingChanges(false);
-             return;
-        }
-
+          }
+        });
+        
         const newPdfBytes = await pdfDoc.save();
         const blob = new Blob([newPdfBytes], { type: 'application/pdf' });
         setEditedPdfUrl(URL.createObjectURL(blob));
+        toast({ title: 'Changes Applied', description: `Successfully added ${redactions.length} whiteout box(es).` });
 
     } catch (error) {
-        console.error('Error applying AI edits:', error);
-        toast({ variant: 'destructive', title: 'Editing Failed', description: 'An error occurred while applying AI edits.' });
+        console.error('Error applying edits:', error);
+        toast({ variant: 'destructive', title: 'Editing Failed', description: 'An error occurred while applying the edits.' });
     } finally {
-        setIsApplyingChanges(false);
+        setIsProcessing(false);
     }
   }
-
-  const suggestionPrompts = [
-    { title: 'Summarize on new page', prompt: 'Add a new final page that summarizes this document.' },
-    { title: 'Redact names', prompt: 'Redact all personal names in this document.' },
-    { title: 'Create title page', prompt: 'Create a new first page with a title and a brief introduction based on the content.' },
-  ];
 
   return (
     <div className="space-y-8">
       <header className="space-y-2">
         <h1 className="text-3xl font-headline font-bold text-primary flex items-center gap-2">
-          <FilePenLine size={32} /> AI PDF Editor
+          <FilePenLine size={32} /> PDF Editor
         </h1>
         <p className="text-muted-foreground">
-          Use AI to redact content or add new pages. Upload a PDF to get started.
+          Upload a PDF to begin editing. Currently supports adding whiteout boxes.
         </p>
       </header>
 
@@ -204,23 +217,58 @@ export default function PdfEditPage() {
         </CardContent>
       </Card>
       
-      {file && (
+      {file && pageInfos.length > 0 && (
         <>
-            <Card>
+            <Card className="shadow-lg">
                 <CardHeader>
-                    <CardTitle>PDF Preview</CardTitle>
-                    <CardDescription>This is a visual preview of your uploaded document.</CardDescription>
+                    <CardTitle className="flex items-center gap-2"><Eraser /> 2. Add Whiteout Boxes</CardTitle>
+                    <CardDescription>Click anywhere on a page to add a whiteout box. Click "Apply Changes" when you are done.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4 bg-muted/30 p-4 rounded-lg">
-                    {pagePreviews.map((src, index) => (
+                    {pageInfos.map((pageInfo, index) => (
                         <div key={index} className="flex flex-col items-center">
-                            <Image 
-                                src={src}
-                                alt={`PDF Page ${index + 1} Preview`}
-                                width={800}
-                                height={1120}
-                                className="w-full max-w-3xl border shadow-md rounded-md"
-                            />
+                            <div 
+                                className="relative w-full max-w-4xl mx-auto cursor-crosshair"
+                                onClick={(e) => handleAddRedaction(index, e)}
+                            >
+                                <Image 
+                                    src={pageInfo.previewUrl}
+                                    alt={`PDF Page ${index + 1} Preview`}
+                                    width={800}
+                                    height={1120}
+                                    className="w-full h-auto border shadow-md rounded-md pointer-events-none"
+                                />
+                                {redactions.filter(r => r.pageIndex === index).map(r => {
+                                    const scaleX = (1 / pageInfos[r.pageIndex].width) * 100;
+                                    const scaleY = (1 / pageInfos[r.pageIndex].height) * 100;
+                                    
+                                    // Convert PDF coordinates back to CSS `top`/`left` percentages
+                                    const left = r.x * scaleX;
+                                    const bottom = r.y * scaleY;
+                                    const top = 100 - (bottom + r.height * scaleY);
+                                    
+                                    return (
+                                        <div
+                                            key={r.id}
+                                            className="absolute bg-white/80 border-2 border-dashed border-red-500 flex items-center justify-center group"
+                                            style={{
+                                                left: `${left}%`,
+                                                top: `${top}%`,
+                                                width: `${r.width * scaleX}%`,
+                                                height: `${r.height * scaleY}%`,
+                                            }}
+                                        >
+                                            <button 
+                                                onClick={(e) => { e.stopPropagation(); handleRemoveRedaction(r.id); }}
+                                                className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                aria-label="Remove redaction"
+                                            >
+                                                <Trash2 size={12} />
+                                            </button>
+                                        </div>
+                                    );
+                                })}
+                            </div>
                             <p className="text-xs text-muted-foreground mt-1">Page {index + 1}</p>
                         </div>
                     ))}
@@ -228,35 +276,12 @@ export default function PdfEditPage() {
             </Card>
 
             <Card className="shadow-lg">
-            <CardHeader>
-                <CardTitle>2. Provide AI Instructions</CardTitle>
-                <CardDescription>Tell the AI what you want to do. Be specific for best results.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-                <Textarea 
-                placeholder="e.g., Redact the name 'Prava Ranjan Nayak' and the Enrolment No."
-                value={userPrompt}
-                onChange={(e) => setUserPrompt(e.target.value)}
-                disabled={isApplyingChanges}
-                rows={4}
-                />
-                <div className="space-y-2">
-                    <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                        <Sparkles className="h-4 w-4 text-accent" />
-                        <span>Suggestions</span>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                        {suggestionPrompts.map(p => (
-                            <Button key={p.title} variant="outline" size="sm" onClick={() => setUserPrompt(p.prompt)} disabled={isApplyingChanges}>
-                                {p.title}
-                            </Button>
-                        ))}
-                    </div>
-                </div>
-
-                <div className="flex flex-col sm:flex-row items-center gap-4 pt-4">
-                    <Button onClick={handleApplyChanges} disabled={isApplyingChanges || !userPrompt}>
-                    {isApplyingChanges ? (
+                <CardHeader>
+                    <CardTitle>3. Apply & Download</CardTitle>
+                </CardHeader>
+                <CardContent className="flex flex-col sm:flex-row items-center gap-4">
+                    <Button onClick={handleApplyChanges} disabled={isProcessing || redactions.length === 0}>
+                    {isProcessing ? (
                         <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         Applying Changes...
@@ -271,8 +296,7 @@ export default function PdfEditPage() {
                         </a>
                         </Button>
                     )}
-                </div>
-            </CardContent>
+                </CardContent>
             </Card>
         </>
       )}
