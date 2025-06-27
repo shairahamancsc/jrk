@@ -6,25 +6,32 @@ import Image from 'next/image';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Slider } from '@/components/ui/slider';
 import { useToast } from '@/hooks/use-toast';
-import { FilePenLine, UploadCloud, Loader2, FileDown, Eraser, Trash2, Type } from 'lucide-react';
+import { FilePenLine, UploadCloud, Loader2, FileDown, Eraser, Trash2, Type, Palette, SlidersHorizontal } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import { cn } from '@/lib/utils';
 
+// State types
 type EditMode = 'whiteout' | 'text';
 
 type Redaction = {
   id: string;
+  type: 'redaction';
   pageIndex: number;
   x: number;
   y: number;
   width: number;
   height: number;
+  color: { r: number; g: number; b: number };
+  opacity: number;
 };
 
 type TextAddition = {
   id: string;
+  type: 'text';
   pageIndex: number;
   x: number;
   y: number;
@@ -33,11 +40,35 @@ type TextAddition = {
   color: { r: number; g: number; b: number };
 };
 
+type EditableItem = Redaction | TextAddition;
+
 type PageInfo = {
   previewUrl: string;
   width: number;
   height: number;
 };
+
+// Helper functions for color conversion
+const hexToRgb = (hex: string): { r: number; g: number; b: number } => {
+    let r = 0, g = 0, b = 0;
+    // 3 digits
+    if (hex.length === 4) {
+        r = parseInt(hex[1] + hex[1], 16);
+        g = parseInt(hex[2] + hex[2], 16);
+        b = parseInt(hex[3] + hex[3], 16);
+    } else if (hex.length === 7) { // 6 digits
+        r = parseInt(hex.slice(1, 3), 16);
+        g = parseInt(hex.slice(3, 5), 16);
+        b = parseInt(hex.slice(5, 7), 16);
+    }
+    return { r: r / 255, g: g / 255, b: b / 255 };
+};
+
+const rgbToHex = (color: { r: number; g: number; b: number }): string => {
+    const toHex = (c: number) => `0${Math.round(c * 255).toString(16)}`.slice(-2);
+    return `#${toHex(color.r)}${toHex(color.g)}${toHex(color.b)}`;
+};
+
 
 export default function PdfEditPage() {
   const { toast } = useToast();
@@ -46,10 +77,10 @@ export default function PdfEditPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   
   const [pageInfos, setPageInfos] = useState<PageInfo[]>([]);
-  const [redactions, setRedactions] = useState<Redaction[]>([]);
-  const [textAdditions, setTextAdditions] = useState<TextAddition[]>([]);
+  const [items, setItems] = useState<EditableItem[]>([]);
   const [editedPdfUrl, setEditedPdfUrl] = useState<string | null>(null);
   const [editMode, setEditMode] = useState<EditMode>('whiteout');
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
 
   useEffect(() => {
     pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
@@ -60,13 +91,13 @@ export default function PdfEditPage() {
     setIsProcessing(false);
     pageInfos.forEach(p => URL.revokeObjectURL(p.previewUrl));
     setPageInfos([]);
-    setRedactions([]);
-    setTextAdditions([]);
+    setItems([]);
     if (editedPdfUrl) {
       URL.revokeObjectURL(editedPdfUrl);
     }
     setEditedPdfUrl(null);
     setEditMode('whiteout');
+    setSelectedItem(null);
   }
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -139,13 +170,17 @@ export default function PdfEditPage() {
         
         const newRedaction: Redaction = {
             id: `redact-${Date.now()}`,
+            type: 'redaction',
             pageIndex,
             x: pdfX,
             y: pdfY,
             width: redactionWidth,
             height: redactionHeight,
+            color: { r: 1, g: 1, b: 1 },
+            opacity: 1,
         };
-        setRedactions(prev => [...prev, newRedaction]);
+        setItems(prev => [...prev, newRedaction]);
+        setSelectedItem(newRedaction.id);
     } else if (editMode === 'text') {
         const text = window.prompt("Enter the text to add:");
         if (text) {
@@ -155,6 +190,7 @@ export default function PdfEditPage() {
             
             const newTextAddition: TextAddition = {
                 id: `text-${Date.now()}`,
+                type: 'text',
                 pageIndex,
                 text,
                 x: pdfX,
@@ -162,23 +198,25 @@ export default function PdfEditPage() {
                 fontSize: fontSize,
                 color: { r: 0, g: 0, b: 0 }, // Black
             };
-            setTextAdditions(prev => [...prev, newTextAddition]);
+            setItems(prev => [...prev, newTextAddition]);
+            setSelectedItem(newTextAddition.id);
         }
     }
   };
   
-  const handleRemoveItem = (idToRemove: string, type: 'redaction' | 'text') => {
-    if (type === 'redaction') {
-        setRedactions(prev => prev.filter(r => r.id !== idToRemove));
-    } else {
-        setTextAdditions(prev => prev.filter(t => t.id !== idToRemove));
-    }
+  const handleDeleteItem = () => {
+    if (!selectedItemId) return;
+    setItems(prev => prev.filter(item => item.id !== selectedItemId));
+    setSelectedItem(null);
   };
 
+  const updateItem = (itemId: string, newProps: Partial<EditableItem>) => {
+    setItems(prev => prev.map(item => item.id === itemId ? { ...item, ...item, ...newProps } : item));
+  };
 
   const handleApplyChanges = async () => {
-    if (!file || (redactions.length === 0 && textAdditions.length === 0)) {
-        toast({ variant: 'destructive', title: 'No Changes to Apply', description: 'Please add at least one whiteout box or text item to the PDF.' });
+    if (!file || items.length === 0) {
+        toast({ variant: 'destructive', title: 'No Changes to Apply', description: 'Please add at least one item to the PDF.' });
         return;
     }
     setIsProcessing(true);
@@ -191,6 +229,9 @@ export default function PdfEditPage() {
         const pages = pdfDoc.getPages();
         const helveticaFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
+        const redactions = items.filter(i => i.type === 'redaction') as Redaction[];
+        const textAdditions = items.filter(i => i.type === 'text') as TextAddition[];
+
         redactions.forEach(r => {
           if (pages[r.pageIndex]) {
             pages[r.pageIndex].drawRectangle({
@@ -198,9 +239,8 @@ export default function PdfEditPage() {
               y: r.y,
               width: r.width,
               height: r.height,
-              color: rgb(1, 1, 1),
-              borderColor: rgb(0.8, 0.8, 0.8),
-              borderWidth: 1,
+              color: rgb(r.color.r, r.color.g, r.color.b),
+              opacity: r.opacity,
             });
           }
         });
@@ -220,7 +260,7 @@ export default function PdfEditPage() {
         const newPdfBytes = await pdfDoc.save();
         const blob = new Blob([newPdfBytes], { type: 'application/pdf' });
         setEditedPdfUrl(URL.createObjectURL(blob));
-        toast({ title: 'Changes Applied', description: 'Your PDF has been updated.' });
+        toast({ title: 'Changes Applied', description: 'Your PDF has been updated and is ready for download.' });
 
     } catch (error) {
         console.error('Error applying edits:', error);
@@ -229,17 +269,77 @@ export default function PdfEditPage() {
         setIsProcessing(false);
     }
   }
+
+  const selectedItem = items.find(item => item.id === selectedItemId) || null;
   
   const EditorToolbar = () => (
-    <div className="bg-muted p-2 rounded-md mb-4 flex items-center gap-2">
-      <Button variant={editMode === 'text' ? 'default' : 'outline'} onClick={() => setEditMode('text')}>
-        <Type className="mr-2 h-4 w-4" /> Text
-      </Button>
-      <Button variant={editMode === 'whiteout' ? 'default' : 'outline'} onClick={() => setEditMode('whiteout')}>
-        <Eraser className="mr-2 h-4 w-4" /> Whiteout
-      </Button>
+    <div className="bg-muted p-2 rounded-md flex items-center justify-between gap-2">
+      <div className="flex items-center gap-2">
+        <Button variant={editMode === 'text' ? 'default' : 'outline'} size="sm" onClick={() => setEditMode('text')}>
+          <Type className="mr-2 h-4 w-4" /> Text
+        </Button>
+        <Button variant={editMode === 'whiteout' ? 'default' : 'outline'} size="sm" onClick={() => setEditMode('whiteout')}>
+          <Eraser className="mr-2 h-4 w-4" /> Whiteout
+        </Button>
+      </div>
+       {selectedItemId && (
+        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={handleDeleteItem}>
+            <Trash2 className="h-4 w-4" />
+            <span className="sr-only">Delete Selected Item</span>
+        </Button>
+       )}
     </div>
   );
+
+  const PropertiesPanel = () => {
+    if (!selectedItem || !selectedItemId) return null;
+
+    if (selectedItem.type === 'redaction') {
+        const r = selectedItem;
+        return (
+            <div className="space-y-4 rounded-md border p-4 bg-background">
+                <h4 className="font-semibold text-center text-sm">Whiteout Properties</h4>
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                        <Label htmlFor="width" className="text-xs">Width</Label>
+                        <Input id="width" type="number" value={Math.round(r.width)} onChange={(e) => updateItem(selectedItemId, { width: parseInt(e.target.value, 10) || 0 })} className="h-8" />
+                    </div>
+                    <div className="space-y-1">
+                        <Label htmlFor="height" className="text-xs">Height</Label>
+                        <Input id="height" type="number" value={Math.round(r.height)} onChange={(e) => updateItem(selectedItemId, { height: parseInt(e.target.value, 10) || 0 })} className="h-8"/>
+                    </div>
+                </div>
+                <div className="space-y-2">
+                    <Label htmlFor="color" className="text-xs flex items-center gap-1"><Palette size={14}/> Color</Label>
+                    <Input id="color" type="color" value={rgbToHex(r.color)} onChange={(e) => updateItem(selectedItemId, { color: hexToRgb(e.target.value) })} className="h-8 p-1"/>
+                </div>
+                 <div className="space-y-2">
+                    <Label htmlFor="opacity" className="text-xs flex items-center gap-1"><SlidersHorizontal size={14}/> Opacity: {Math.round(r.opacity * 100)}%</Label>
+                    <Slider id="opacity" value={[r.opacity]} onValueChange={([val]) => updateItem(selectedItemId, { opacity: val })} max={1} step={0.01} />
+                </div>
+            </div>
+        )
+    }
+
+    if (selectedItem.type === 'text') {
+        const t = selectedItem;
+        return (
+             <div className="space-y-4 rounded-md border p-4 bg-background">
+                <h4 className="font-semibold text-center text-sm">Text Properties</h4>
+                 <div className="space-y-1">
+                    <Label htmlFor="fontSize" className="text-xs">Font Size</Label>
+                    <Input id="fontSize" type="number" value={Math.round(t.fontSize)} onChange={(e) => updateItem(selectedItemId, { fontSize: parseInt(e.target.value, 10) || 0 })} className="h-8" />
+                </div>
+                <div className="space-y-2">
+                    <Label htmlFor="color" className="text-xs flex items-center gap-1"><Palette size={14}/> Color</Label>
+                    <Input id="color" type="color" value={rgbToHex(t.color)} onChange={(e) => updateItem(selectedItemId, { color: hexToRgb(e.target.value) })} className="h-8 p-1"/>
+                </div>
+             </div>
+        )
+    }
+
+    return null;
+  }
 
   return (
     <div className="space-y-8">
@@ -248,7 +348,7 @@ export default function PdfEditPage() {
           <FilePenLine size={32} /> PDF Editor
         </h1>
         <p className="text-muted-foreground">
-          Upload a PDF to add text or whiteout boxes.
+          Upload a PDF to add text or whiteout boxes. Click an item to edit its properties.
         </p>
       </header>
 
@@ -281,85 +381,96 @@ export default function PdfEditPage() {
             <Card className="shadow-lg">
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">2. Edit Your PDF</CardTitle>
-                    <CardDescription>Use the toolbar to select a tool, then click on a page to apply it.</CardDescription>
+                    <CardDescription>Use the toolbar to select a tool, then click on a page to apply it. Click an item to select it and modify its properties.</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4 bg-muted/30 p-4 rounded-lg">
-                    <EditorToolbar />
-                    {pageInfos.map((pageInfo, index) => (
-                        <div key={index} className="flex flex-col items-center">
-                            <div 
-                                className="relative w-full max-w-4xl mx-auto cursor-crosshair"
-                                onClick={(e) => handlePageClick(index, e)}
-                            >
-                                <Image 
-                                    src={pageInfo.previewUrl}
-                                    alt={`PDF Page ${index + 1} Preview`}
-                                    width={800}
-                                    height={1120}
-                                    className="w-full h-auto border shadow-md rounded-md pointer-events-none"
-                                />
-                                {redactions.filter(r => r.pageIndex === index).map(r => {
-                                    const scaleX = (1 / pageInfos[r.pageIndex].width) * 100;
-                                    const scaleY = (1 / pageInfos[r.pageIndex].height) * 100;
-                                    const left = r.x * scaleX;
-                                    const bottom = r.y * scaleY;
-                                    const top = 100 - (bottom + r.height * scaleY);
-                                    
-                                    return (
-                                        <div
-                                            key={r.id}
-                                            className="absolute bg-white/80 border-2 border-dashed border-red-500 flex items-center justify-center group"
-                                            style={{
-                                                left: `${left}%`,
-                                                top: `${top}%`,
-                                                width: `${r.width * scaleX}%`,
-                                                height: `${r.height * scaleY}%`,
-                                            }}
-                                        >
-                                            <button 
-                                                onClick={(e) => { e.stopPropagation(); handleRemoveItem(r.id, 'redaction'); }}
-                                                className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                aria-label="Remove redaction"
-                                            >
-                                                <Trash2 size={12} />
-                                            </button>
-                                        </div>
-                                    );
-                                })}
-                                {textAdditions.filter(t => t.pageIndex === index).map(t => {
-                                    const scaleX = (1 / pageInfos[t.pageIndex].width) * 100;
-                                    const scaleY = (1 / pageInfos[t.pageIndex].height) * 100;
-                                    const left = t.x * scaleX;
-                                    const bottom = t.y * scaleY;
-                                    const top = 100 - (bottom + (t.fontSize - 4) * scaleY);
+                <CardContent>
+                  <div className="grid grid-cols-1 lg:grid-cols-[1fr_250px] gap-4">
+                    <div className="space-y-4 bg-muted/30 p-4 rounded-lg">
+                        <EditorToolbar />
+                        <div className="space-y-4">
+                            {pageInfos.map((pageInfo, index) => (
+                                <div key={index} className="flex flex-col items-center">
+                                    <div 
+                                        className="relative w-full max-w-4xl mx-auto cursor-crosshair"
+                                        onClick={(e) => handlePageClick(index, e)}
+                                    >
+                                        <Image 
+                                            src={pageInfo.previewUrl}
+                                            alt={`PDF Page ${index + 1} Preview`}
+                                            width={800}
+                                            height={1120}
+                                            className="w-full h-auto border shadow-md rounded-md pointer-events-none"
+                                        />
+                                        {items.map(item => {
+                                            if (item.pageIndex !== index) return null;
+                                            
+                                            const scaleX = (1 / pageInfos[item.pageIndex].width) * 100;
+                                            const scaleY = (1 / pageInfos[item.pageIndex].height) * 100;
+                                            
+                                            if (item.type === 'redaction') {
+                                                const r = item;
+                                                const left = r.x * scaleX;
+                                                const bottom = r.y * scaleY;
+                                                const top = 100 - (bottom + r.height * scaleY);
+                                                
+                                                return (
+                                                    <div
+                                                        key={r.id}
+                                                        className={cn(
+                                                          "absolute border-2 cursor-pointer",
+                                                          selectedItemId === r.id ? "border-primary z-10" : "border-transparent"
+                                                        )}
+                                                        style={{
+                                                            left: `${left}%`,
+                                                            top: `${top}%`,
+                                                            width: `${r.width * scaleX}%`,
+                                                            height: `${r.height * scaleY}%`,
+                                                            backgroundColor: `rgba(${r.color.r * 255}, ${r.color.g * 255}, ${r.color.b * 255}, ${r.opacity})`,
+                                                        }}
+                                                        onClick={(e) => { e.stopPropagation(); setSelectedItemId(r.id); }}
+                                                    />
+                                                );
+                                            }
 
-                                    return (
-                                        <div
-                                            key={t.id}
-                                            className="absolute p-1 group cursor-text"
-                                            style={{
-                                                left: `${left}%`,
-                                                top: `${top}%`,
-                                                fontSize: `${(t.fontSize / pageInfo.height) * 100 * (1 / (pageInfo.height / 842))}em`, // Approximate scaling
-                                                color: `rgb(${t.color.r * 255}, ${t.color.g * 255}, ${t.color.b * 255})`,
-                                                lineHeight: 1,
-                                            }}
-                                        >
-                                            {t.text}
-                                            <button 
-                                                onClick={(e) => { e.stopPropagation(); handleRemoveItem(t.id, 'text'); }}
-                                                className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                aria-label="Remove text"
-                                            >
-                                                <Trash2 size={12} />
-                                            </button>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                            <p className="text-xs text-muted-foreground mt-1">Page {index + 1}</p>
+                                            if (item.type === 'text') {
+                                                const t = item;
+                                                const left = t.x * scaleX;
+                                                const bottom = t.y * scaleY;
+                                                const top = 100 - (bottom + (t.fontSize - 4) * scaleY);
+
+                                                return (
+                                                    <div
+                                                        key={t.id}
+                                                        className={cn(
+                                                          "absolute p-1 cursor-pointer",
+                                                          selectedItemId === t.id ? "ring-2 ring-primary ring-offset-2 z-10" : ""
+                                                        )}
+                                                        style={{
+                                                            left: `${left}%`,
+                                                            top: `${top}%`,
+                                                            fontSize: `${(t.fontSize / pageInfo.height) * 100 * (1 / (pageInfo.height / 842))}em`, // Approximate scaling
+                                                            color: `rgb(${t.color.r * 255}, ${t.color.g * 255}, ${t.color.b * 255})`,
+                                                            lineHeight: 1,
+                                                            whiteSpace: 'pre',
+                                                        }}
+                                                         onClick={(e) => { e.stopPropagation(); setSelectedItemId(t.id); }}
+                                                    >
+                                                        {t.text}
+                                                    </div>
+                                                );
+                                            }
+                                            return null;
+                                        })}
+                                    </div>
+                                    <p className="text-xs text-muted-foreground mt-1">Page {index + 1}</p>
+                                </div>
+                            ))}
                         </div>
-                    ))}
+                    </div>
+                    <div>
+                        <PropertiesPanel />
+                    </div>
+                  </div>
                 </CardContent>
             </Card>
 
@@ -368,7 +479,7 @@ export default function PdfEditPage() {
                     <CardTitle>3. Apply & Download</CardTitle>
                 </CardHeader>
                 <CardContent className="flex flex-col sm:flex-row items-center gap-4">
-                    <Button onClick={handleApplyChanges} disabled={isProcessing || (redactions.length === 0 && textAdditions.length === 0)}>
+                    <Button onClick={handleApplyChanges} disabled={isProcessing || items.length === 0}>
                     {isProcessing ? (
                         <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
