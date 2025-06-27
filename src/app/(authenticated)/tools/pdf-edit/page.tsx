@@ -97,7 +97,7 @@ export default function PdfEditPage() {
     }
     setEditedPdfUrl(null);
     setEditMode('whiteout');
-    setSelectedItem(null);
+    setSelectedItemId(null);
   }
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -180,7 +180,7 @@ export default function PdfEditPage() {
             opacity: 1,
         };
         setItems(prev => [...prev, newRedaction]);
-        setSelectedItem(newRedaction.id);
+        setSelectedItemId(newRedaction.id);
     } else if (editMode === 'text') {
         const text = window.prompt("Enter the text to add:");
         if (text) {
@@ -199,7 +199,7 @@ export default function PdfEditPage() {
                 color: { r: 0, g: 0, b: 0 }, // Black
             };
             setItems(prev => [...prev, newTextAddition]);
-            setSelectedItem(newTextAddition.id);
+            setSelectedItemId(newTextAddition.id);
         }
     }
   };
@@ -207,7 +207,7 @@ export default function PdfEditPage() {
   const handleDeleteItem = () => {
     if (!selectedItemId) return;
     setItems(prev => prev.filter(item => item.id !== selectedItemId));
-    setSelectedItem(null);
+    setSelectedItemId(null);
   };
 
   const updateItem = (itemId: string, newProps: Partial<EditableItem>) => {
