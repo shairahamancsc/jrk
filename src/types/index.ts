@@ -16,6 +16,20 @@ export interface LaborProfile {
   user_id?: string; 
 }
 
+export interface CustomerProfile {
+  id: string; // uuid from supabase
+  user_id?: string;
+  created_at: string;
+  customer_id: string; // User-defined ID
+  name: string;
+  mobile_no: string;
+  address: string;
+  category: string;
+  ownership_type: string;
+  load_in_tons: number;
+  payment_rate_per_load: number;
+}
+
 export type AttendanceStatus = 'present' | 'absent';
 
 export interface AttendanceEntry {
@@ -65,6 +79,55 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      customers: {
+        Row: {
+          id: string
+          user_id: string
+          created_at: string
+          customer_id: string
+          name: string
+          mobile_no: string
+          address: string
+          category: string
+          ownership_type: string
+          load_in_tons: number
+          payment_rate_per_load: number
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          created_at?: string
+          customer_id: string
+          name: string
+          mobile_no: string
+          address: string
+          category: string
+          ownership_type: string
+          load_in_tons: number
+          payment_rate_per_load: number
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          created_at?: string
+          customer_id?: string
+          name?: string
+          mobile_no?: string
+          address?: string
+          category?: string
+          ownership_type?: string
+          load_in_tons?: number
+          payment_rate_per_load?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customers_user_id_fkey"
+            columns: ["user_id"]
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       labor_profiles: {
         Row: {
           id: string
@@ -235,3 +298,5 @@ export interface LaborProfileFormDataWithFiles extends Omit<LaborProfile, 'id' |
   pan?: File;
   drivingLicense?: File;
 }
+
+export interface CustomerProfileFormData extends Omit<CustomerProfile, 'id' | 'created_at' | 'user_id'> {}

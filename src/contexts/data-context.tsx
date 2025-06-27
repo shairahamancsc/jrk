@@ -4,20 +4,25 @@
 import type { ReactNode } from 'react';
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase/client';
-import type { LaborProfile, AttendanceEntry, LaborProfileFormDataWithFiles, Database, PaymentHistoryEntry } from '@/types';
+import type { LaborProfile, AttendanceEntry, LaborProfileFormDataWithFiles, Database, PaymentHistoryEntry, CustomerProfile, CustomerProfileFormData } from '@/types';
 import { useAuth } from './auth-context'; 
 import { useToast } from "@/hooks/use-toast";
 import { formatISO } from 'date-fns';
 
 interface DataContextType {
   laborProfiles: LaborProfile[];
+  customerProfiles: CustomerProfile[];
   attendanceEntries: AttendanceEntry[];
   paymentHistory: PaymentHistoryEntry[];
   addLaborProfile: (profileData: LaborProfileFormDataWithFiles) => Promise<void>;
-  addAttendanceEntry: (entryData: Omit<AttendanceEntry, 'id' | 'created_at' | 'user_id'>) => Promise<void>;
-  deleteLaborProfile: (profileId: string) => Promise<void>;
   updateLaborProfile: (profileId: string, profileData: Partial<LaborProfileFormDataWithFiles>) => Promise<void>; 
+  deleteLaborProfile: (profileId: string) => Promise<void>;
   fetchLaborProfileById: (profileId: string) => Promise<LaborProfile | null>;
+  addCustomerProfile: (profileData: CustomerProfileFormData) => Promise<void>;
+  updateCustomerProfile: (profileId: string, profileData: Partial<CustomerProfileFormData>) => Promise<void>;
+  deleteCustomerProfile: (profileId: string) => Promise<void>;
+  fetchCustomerProfileById: (profileId: string) => Promise<CustomerProfile | null>;
+  addAttendanceEntry: (entryData: Omit<AttendanceEntry, 'id' | 'created_at' | 'user_id'>) => Promise<void>;
   addPaymentHistoryEntry: (paymentData: Omit<PaymentHistoryEntry, 'id' | 'created_at' | 'user_id'>) => Promise<void>;
   fetchPaymentHistory: () => Promise<void>;
   isLoading: boolean;
@@ -46,6 +51,7 @@ const getPathFromUrl = (url: string): string | null => {
 
 export const DataProvider = ({ children }: { children: ReactNode }) => {
   const [laborProfiles, setLaborProfiles] = useState<LaborProfile[]>([]);
+  const [customerProfiles, setCustomerProfiles] = useState<CustomerProfile[]>([]);
   const [attendanceEntries, setAttendanceEntries] = useState<AttendanceEntry[]>([]);
   const [paymentHistory, setPaymentHistory] = useState<PaymentHistoryEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -72,6 +78,26 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const fetchCustomerProfiles = async () => {
+    if (!user?.id) {
+      setCustomerProfiles([]);
+      return;
+    }
+    const { data, error } = await supabase
+      .from('customers')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('[DataProvider] Error fetching customer profiles:', error);
+      toast({ variant: "destructive", title: "Fetch Error", description: "Could not fetch customer profiles." });
+      setCustomerProfiles([]);
+    } else {
+      setCustomerProfiles(data || []);
+    }
+  };
+
   const fetchLaborProfileById = async (profileId: string): Promise<LaborProfile | null> => {
     if (!user?.id) {
         toast({ variant: "destructive", title: "Auth Error", description: "User not authenticated." });
@@ -94,6 +120,27 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     return data;
   };
 
+  const fetchCustomerProfileById = async (profileId: string): Promise<CustomerProfile | null> => {
+    if (!user?.id) {
+        toast({ variant: "destructive", title: "Auth Error", description: "User not authenticated." });
+        return null;
+    }
+    const { data, error } = await supabase
+        .from('customers')
+        .select('*')
+        .eq('id', profileId)
+        .eq('user_id', user.id)
+        .single();
+    
+    if (error) {
+        console.error(`[DataProvider] Error fetching customer profile by ID ${profileId}:`, error);
+        if (error.code !== 'PGRST116') { 
+             toast({ variant: "destructive", title: "Fetch Error", description: `Could not fetch profile: ${error.message}` });
+        }
+        return null;
+    }
+    return data;
+  };
 
   const fetchAttendanceEntries = async () => {
     if (!user?.id) {
@@ -135,16 +182,19 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true);
       if (user?.id) {
-        await fetchLaborProfiles();
-        await fetchAttendanceEntries();
-        await fetchPaymentHistory();
+        await Promise.all([
+          fetchLaborProfiles(),
+          fetchCustomerProfiles(),
+          fetchAttendanceEntries(),
+          fetchPaymentHistory()
+        ]);
       } else {
         setLaborProfiles([]);
+        setCustomerProfiles([]);
         setAttendanceEntries([]);
         setPaymentHistory([]);
       }
@@ -418,6 +468,91 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     setIsLoading(false);
   };
 
+  const addCustomerProfile = async (profileData: CustomerProfileFormData) => {
+    if (!user?.id) {
+      toast({ variant: "destructive", title: "Auth Error", description: "User not authenticated to add customer." });
+      return;
+    }
+    setIsLoading(true);
+
+    const profileToInsert: Database['public']['Tables']['customers']['Insert'] = {
+      user_id: user.id,
+      ...profileData,
+    };
+    
+    const { data, error } = await supabase
+      .from('customers')
+      .insert(profileToInsert)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('[DataProvider] Error adding customer profile:', error);
+      toast({ variant: "destructive", title: "Database Error", description: `Could not add customer profile: ${error.message}` });
+    } else if (data) {
+      await fetchCustomerProfiles(); 
+      toast({ title: "Success", description: "Customer profile added." });
+    }
+    setIsLoading(false);
+  };
+
+  const updateCustomerProfile = async (profileId: string, profileData: Partial<CustomerProfileFormData>) => {
+    if (!user?.id) {
+        toast({ variant: "destructive", title: "Auth Error", description: "User not authenticated." });
+        return;
+    }
+    setIsLoading(true);
+
+    const { error } = await supabase
+      .from('customers')
+      .update(profileData)
+      .eq('id', profileId)
+      .eq('user_id', user.id);
+
+    if (error) {
+      console.error('[DataProvider] Error updating customer profile:', error);
+      toast({ variant: "destructive", title: "Update Failed", description: `Could not update profile: ${error.message}` });
+    } else {
+      await fetchCustomerProfiles();
+      toast({ title: "Success", description: `Customer profile updated.` });
+    }
+    setIsLoading(false);
+  };
+  
+  const deleteCustomerProfile = async (profileId: string) => {
+    if (!user?.id) {
+      toast({ variant: "destructive", title: "Auth Error", description: "User not authenticated." });
+      throw new Error("User not authenticated");
+    }
+  
+    const profileToDelete = customerProfiles.find(p => p.id === profileId);
+    if (!profileToDelete) {
+      toast({ variant: "destructive", title: "Error", description: "Profile not found." });
+      throw new Error("Profile not found");
+    }
+  
+    setIsLoading(true);
+    try {
+      const { error: dbError } = await supabase
+        .from('customers')
+        .delete()
+        .eq('id', profileId)
+        .eq('user_id', user.id);
+  
+      if (dbError) {
+        console.error('[DataProvider] Error deleting customer profile from database:', dbError);
+        toast({ variant: "destructive", title: "Database Error", description: `Could not delete profile: ${dbError.message}` });
+        throw dbError;
+      }
+  
+      setCustomerProfiles(prevProfiles => prevProfiles.filter(p => p.id !== profileId));
+      toast({ title: "Success", description: `Profile for ${profileToDelete.name} deleted.` });
+    } catch (error) {
+      console.error('[DataProvider] Overall error in deleteCustomerProfile:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const addAttendanceEntry = async (entryData: Omit<AttendanceEntry, 'id' | 'created_at' | 'user_id'>) => {
      if (!user?.id) {
@@ -492,13 +627,18 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   return (
     <DataContext.Provider value={{ 
         laborProfiles, 
+        customerProfiles,
         attendanceEntries, 
         paymentHistory,
         addLaborProfile, 
-        addAttendanceEntry, 
+        updateLaborProfile,
         deleteLaborProfile,
-        updateLaborProfile, 
         fetchLaborProfileById,
+        addCustomerProfile,
+        updateCustomerProfile,
+        deleteCustomerProfile,
+        fetchCustomerProfileById,
+        addAttendanceEntry, 
         addPaymentHistoryEntry,
         fetchPaymentHistory,
         isLoading 
@@ -515,8 +655,3 @@ export const useData = () => {
   }
   return context;
 };
-
-
-    
-
-    
