@@ -7,9 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Slider } from '@/components/ui/slider';
 import { useToast } from '@/hooks/use-toast';
-import { FilePenLine, UploadCloud, Loader2, FileDown, Eraser, Trash2, Type, Palette, SlidersHorizontal } from 'lucide-react';
+import { FilePenLine, UploadCloud, Loader2, FileDown, Eraser, Trash2, Type, Palette, Copy } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import { cn } from '@/lib/utils';
@@ -69,6 +68,80 @@ const rgbToHex = (color: { r: number; g: number; b: number }): string => {
     return `#${toHex(color.r)}${toHex(color.g)}${toHex(color.b)}`;
 };
 
+// Floating Toolbar Component
+const FloatingToolbar = ({
+  item,
+  updateItem,
+  deleteItem,
+  duplicateItem,
+}: {
+  item: EditableItem;
+  updateItem: (itemId: string, newProps: Partial<EditableItem>) => void;
+  deleteItem: (itemId: string) => void;
+  duplicateItem: (itemId: string) => void;
+}) => {
+  return (
+    <div className="flex items-center gap-1 p-1 bg-white rounded-md shadow-lg border border-gray-300">
+      {item.type === 'text' && (
+        <div className="flex items-center gap-1 px-1">
+          <Label htmlFor="font-size" className="text-xs">Size:</Label>
+          <Input
+            id="font-size"
+            type="number"
+            value={Math.round(item.fontSize)}
+            onClick={(e) => e.stopPropagation()}
+            onChange={(e) => updateItem(item.id, { fontSize: parseInt(e.target.value, 10) || 1 })}
+            className="w-16 h-8 text-xs"
+          />
+        </div>
+      )}
+      {item.type === 'redaction' && (
+        <>
+          <div className="flex items-center gap-1 px-1">
+            <Label htmlFor="width" className="text-xs">W:</Label>
+            <Input
+              id="width"
+              type="number"
+              value={Math.round(item.width)}
+              onClick={(e) => e.stopPropagation()}
+              onChange={(e) => updateItem(item.id, { width: parseInt(e.target.value, 10) || 0 })}
+              className="w-16 h-8 text-xs"
+            />
+          </div>
+          <div className="flex items-center gap-1 px-1">
+            <Label htmlFor="height" className="text-xs">H:</Label>
+            <Input
+              id="height"
+              type="number"
+              value={Math.round(item.height)}
+              onClick={(e) => e.stopPropagation()}
+              onChange={(e) => updateItem(item.id, { height: parseInt(e.target.value, 10) || 0 })}
+              className="w-16 h-8 text-xs"
+            />
+          </div>
+        </>
+      )}
+
+      <div className="p-1">
+        <Input
+          type="color"
+          aria-label="Color"
+          value={rgbToHex(item.color)}
+          onClick={(e) => e.stopPropagation()}
+          onChange={(e) => updateItem(item.id, { color: hexToRgb(e.target.value) })}
+          className="h-7 w-7 p-0.5 border-none cursor-pointer"
+        />
+      </div>
+
+      <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); duplicateItem(item.id); }} className="h-8 w-8" aria-label="Duplicate">
+        <Copy size={16} />
+      </Button>
+      <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); deleteItem(item.id); }} className="text-destructive h-8 w-8" aria-label="Delete">
+        <Trash2 size={16} />
+      </Button>
+    </div>
+  );
+};
 
 export default function PdfEditPage() {
   const { toast } = useToast();
@@ -149,6 +222,11 @@ export default function PdfEditPage() {
   };
   
   const handlePageClick = (pageIndex: number, event: React.MouseEvent<HTMLDivElement>) => {
+    // Prevent adding new items if a selected item was clicked
+    if ((event.target as HTMLElement).closest('[data-editable-item="true"]')) {
+      return;
+    }
+
     const pageInfo = pageInfos[pageIndex];
     if (!pageInfo) return;
 
@@ -204,14 +282,30 @@ export default function PdfEditPage() {
     }
   };
   
-  const handleDeleteItem = () => {
-    if (!selectedItemId) return;
-    setItems(prev => prev.filter(item => item.id !== selectedItemId));
-    setSelectedItemId(null);
+  const handleDeleteItem = (itemId: string) => {
+    if (selectedItemId === itemId) {
+      setSelectedItemId(null);
+    }
+    setItems(prev => prev.filter(item => item.id !== itemId));
+  };
+  
+  const handleDuplicateItem = (itemId: string) => {
+    const itemToDuplicate = items.find((item) => item.id === itemId);
+    if (!itemToDuplicate) return;
+
+    const newItem: EditableItem = {
+      ...itemToDuplicate,
+      id: `${itemToDuplicate.type}-${Date.now()}`,
+      x: itemToDuplicate.x + 20, // Offset a bit
+      y: itemToDuplicate.y - 20, // Offset a bit
+    };
+
+    setItems((prev) => [...prev, newItem]);
+    setSelectedItemId(newItem.id);
   };
 
   const updateItem = (itemId: string, newProps: Partial<EditableItem>) => {
-    setItems(prev => prev.map(item => item.id === itemId ? { ...item, ...item, ...newProps } : item));
+    setItems(prev => prev.map(item => item.id === itemId ? { ...item, ...newProps } : item));
   };
 
   const handleApplyChanges = async () => {
@@ -229,30 +323,26 @@ export default function PdfEditPage() {
         const pages = pdfDoc.getPages();
         const helveticaFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
-        const redactions = items.filter(i => i.type === 'redaction') as Redaction[];
-        const textAdditions = items.filter(i => i.type === 'text') as TextAddition[];
+        items.forEach(item => {
+            const page = pages[item.pageIndex];
+            if (!page) return;
 
-        redactions.forEach(r => {
-          if (pages[r.pageIndex]) {
-            pages[r.pageIndex].drawRectangle({
-              x: r.x,
-              y: r.y,
-              width: r.width,
-              height: r.height,
-              color: rgb(r.color.r, r.color.g, r.color.b),
-              opacity: r.opacity,
-            });
-          }
-        });
-
-        textAdditions.forEach(t => {
-            if (pages[t.pageIndex]) {
-                pages[t.pageIndex].drawText(t.text, {
-                    x: t.x,
-                    y: t.y,
+            if(item.type === 'redaction') {
+                page.drawRectangle({
+                    x: item.x,
+                    y: item.y,
+                    width: item.width,
+                    height: item.height,
+                    color: rgb(item.color.r, item.color.g, item.color.b),
+                    opacity: item.opacity,
+                });
+            } else if (item.type === 'text') {
+                page.drawText(item.text, {
+                    x: item.x,
+                    y: item.y,
                     font: helveticaFont,
-                    size: t.fontSize,
-                    color: rgb(t.color.r, t.color.g, t.color.b),
+                    size: item.fontSize,
+                    color: rgb(item.color.r, item.color.g, item.color.b),
                 });
             }
         });
@@ -282,64 +372,8 @@ export default function PdfEditPage() {
           <Eraser className="mr-2 h-4 w-4" /> Whiteout
         </Button>
       </div>
-       {selectedItemId && (
-        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={handleDeleteItem}>
-            <Trash2 className="h-4 w-4" />
-            <span className="sr-only">Delete Selected Item</span>
-        </Button>
-       )}
     </div>
   );
-
-  const PropertiesPanel = () => {
-    if (!selectedItem || !selectedItemId) return null;
-
-    if (selectedItem.type === 'redaction') {
-        const r = selectedItem;
-        return (
-            <div className="space-y-4 rounded-md border p-4 bg-background">
-                <h4 className="font-semibold text-center text-sm">Whiteout Properties</h4>
-                <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                        <Label htmlFor="width" className="text-xs">Width</Label>
-                        <Input id="width" type="number" value={Math.round(r.width)} onChange={(e) => updateItem(selectedItemId, { width: parseInt(e.target.value, 10) || 0 })} className="h-8" />
-                    </div>
-                    <div className="space-y-1">
-                        <Label htmlFor="height" className="text-xs">Height</Label>
-                        <Input id="height" type="number" value={Math.round(r.height)} onChange={(e) => updateItem(selectedItemId, { height: parseInt(e.target.value, 10) || 0 })} className="h-8"/>
-                    </div>
-                </div>
-                <div className="space-y-2">
-                    <Label htmlFor="color" className="text-xs flex items-center gap-1"><Palette size={14}/> Color</Label>
-                    <Input id="color" type="color" value={rgbToHex(r.color)} onChange={(e) => updateItem(selectedItemId, { color: hexToRgb(e.target.value) })} className="h-8 p-1"/>
-                </div>
-                 <div className="space-y-2">
-                    <Label htmlFor="opacity" className="text-xs flex items-center gap-1"><SlidersHorizontal size={14}/> Opacity: {Math.round(r.opacity * 100)}%</Label>
-                    <Slider id="opacity" value={[r.opacity]} onValueChange={([val]) => updateItem(selectedItemId, { opacity: val })} max={1} step={0.01} />
-                </div>
-            </div>
-        )
-    }
-
-    if (selectedItem.type === 'text') {
-        const t = selectedItem;
-        return (
-             <div className="space-y-4 rounded-md border p-4 bg-background">
-                <h4 className="font-semibold text-center text-sm">Text Properties</h4>
-                 <div className="space-y-1">
-                    <Label htmlFor="fontSize" className="text-xs">Font Size</Label>
-                    <Input id="fontSize" type="number" value={Math.round(t.fontSize)} onChange={(e) => updateItem(selectedItemId, { fontSize: parseInt(e.target.value, 10) || 0 })} className="h-8" />
-                </div>
-                <div className="space-y-2">
-                    <Label htmlFor="color" className="text-xs flex items-center gap-1"><Palette size={14}/> Color</Label>
-                    <Input id="color" type="color" value={rgbToHex(t.color)} onChange={(e) => updateItem(selectedItemId, { color: hexToRgb(e.target.value) })} className="h-8 p-1"/>
-                </div>
-             </div>
-        )
-    }
-
-    return null;
-  }
 
   return (
     <div className="space-y-8">
@@ -348,7 +382,7 @@ export default function PdfEditPage() {
           <FilePenLine size={32} /> PDF Editor
         </h1>
         <p className="text-muted-foreground">
-          Upload a PDF to add text or whiteout boxes. Click an item to edit its properties.
+          Upload a PDF to add text or whiteout boxes. Click an item to edit it.
         </p>
       </header>
 
@@ -381,95 +415,112 @@ export default function PdfEditPage() {
             <Card className="shadow-lg">
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">2. Edit Your PDF</CardTitle>
-                    <CardDescription>Use the toolbar to select a tool, then click on a page to apply it. Click an item to select it and modify its properties.</CardDescription>
+                    <CardDescription>Use the toolbar to select a tool, then click on a page. Click an item to select it and show its properties.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-1 lg:grid-cols-[1fr_250px] gap-4">
-                    <div className="space-y-4 bg-muted/30 p-4 rounded-lg">
-                        <EditorToolbar />
-                        <div className="space-y-4">
-                            {pageInfos.map((pageInfo, index) => (
-                                <div key={index} className="flex flex-col items-center">
-                                    <div 
-                                        className="relative w-full max-w-4xl mx-auto cursor-crosshair"
-                                        onClick={(e) => handlePageClick(index, e)}
-                                    >
-                                        <Image 
-                                            src={pageInfo.previewUrl}
-                                            alt={`PDF Page ${index + 1} Preview`}
-                                            width={800}
-                                            height={1120}
-                                            className="w-full h-auto border shadow-md rounded-md pointer-events-none"
-                                        />
-                                        {items.map(item => {
-                                            if (item.pageIndex !== index) return null;
-                                            
-                                            const scaleX = (1 / pageInfos[item.pageIndex].width) * 100;
-                                            const scaleY = (1 / pageInfos[item.pageIndex].height) * 100;
-                                            
-                                            if (item.type === 'redaction') {
-                                                const r = item;
-                                                const left = r.x * scaleX;
-                                                const bottom = r.y * scaleY;
-                                                const top = 100 - (bottom + r.height * scaleY);
-                                                
-                                                return (
-                                                    <div
-                                                        key={r.id}
-                                                        className={cn(
-                                                          "absolute border-2 cursor-pointer",
-                                                          selectedItemId === r.id ? "border-primary z-10" : "border-transparent"
-                                                        )}
-                                                        style={{
-                                                            left: `${left}%`,
-                                                            top: `${top}%`,
-                                                            width: `${r.width * scaleX}%`,
-                                                            height: `${r.height * scaleY}%`,
-                                                            backgroundColor: `rgba(${r.color.r * 255}, ${r.color.g * 255}, ${r.color.b * 255}, ${r.opacity})`,
-                                                        }}
-                                                        onClick={(e) => { e.stopPropagation(); setSelectedItemId(r.id); }}
-                                                    />
-                                                );
-                                            }
+                  <div className="space-y-4 bg-muted/30 p-4 rounded-lg">
+                      <EditorToolbar />
+                      <div className="space-y-4">
+                          {pageInfos.map((pageInfo, index) => (
+                              <div key={index} className="flex flex-col items-center">
+                                  <div 
+                                      className="relative w-full max-w-4xl mx-auto cursor-crosshair"
+                                      onClick={(e) => handlePageClick(index, e)}
+                                      onMouseDown={() => {
+                                        // Deselect when clicking on page background
+                                        if (selectedItemId) {
+                                           const target = event?.target as HTMLElement;
+                                           if (target.closest('[data-editable-item="true"]') === null) {
+                                             setSelectedItemId(null);
+                                           }
+                                        }
+                                      }}
+                                  >
+                                      <Image 
+                                          src={pageInfo.previewUrl}
+                                          alt={`PDF Page ${index + 1} Preview`}
+                                          width={800}
+                                          height={1120}
+                                          className="w-full h-auto border shadow-md rounded-md pointer-events-none"
+                                      />
+                                      {items.map(item => {
+                                          if (item.pageIndex !== index) return null;
+                                          
+                                          const scaleX = (100 / pageInfo.width);
+                                          const scaleY = (100 / pageInfo.height);
+                                          
+                                          if (item.type === 'redaction') {
+                                              const r = item;
+                                              return (
+                                                  <div
+                                                      key={r.id}
+                                                      data-editable-item="true"
+                                                      className={cn(
+                                                        "absolute border-2 cursor-pointer",
+                                                        selectedItemId === r.id ? "border-primary z-10" : "border-transparent hover:border-primary/50"
+                                                      )}
+                                                      style={{
+                                                          left: `${r.x * scaleX}%`,
+                                                          top: `${100 - (r.y + r.height) * scaleY}%`,
+                                                          width: `${r.width * scaleX}%`,
+                                                          height: `${r.height * scaleY}%`,
+                                                          backgroundColor: `rgba(${r.color.r * 255}, ${r.color.g * 255}, ${r.color.b * 255}, ${r.opacity})`,
+                                                      }}
+                                                      onClick={(e) => { e.stopPropagation(); setSelectedItemId(r.id); }}
+                                                  />
+                                              );
+                                          }
 
-                                            if (item.type === 'text') {
-                                                const t = item;
-                                                const left = t.x * scaleX;
-                                                const bottom = t.y * scaleY;
-                                                const top = 100 - (bottom + (t.fontSize - 4) * scaleY);
+                                          if (item.type === 'text') {
+                                              const t = item;
+                                              return (
+                                                  <div
+                                                      key={t.id}
+                                                      data-editable-item="true"
+                                                      className={cn(
+                                                        "absolute p-1 cursor-pointer select-none",
+                                                        selectedItemId === t.id ? "ring-2 ring-primary ring-offset-background z-10" : "hover:ring-1 hover:ring-primary/50"
+                                                      )}
+                                                      style={{
+                                                          left: `${t.x * scaleX}%`,
+                                                          top: `${100 - (t.y + t.fontSize) * scaleY}%`,
+                                                          fontSize: `${(t.fontSize / pageInfo.height) * 100 * (1 / (pageInfo.height / 842))}em`, // Approximate scaling
+                                                          color: `rgb(${t.color.r * 255}, ${t.color.g * 255}, ${t.color.b * 255})`,
+                                                          lineHeight: 1,
+                                                          whiteSpace: 'pre',
+                                                      }}
+                                                       onClick={(e) => { e.stopPropagation(); setSelectedItemId(t.id); }}
+                                                  >
+                                                      {t.text}
+                                                  </div>
+                                              );
+                                          }
+                                          return null;
+                                      })}
 
-                                                return (
-                                                    <div
-                                                        key={t.id}
-                                                        className={cn(
-                                                          "absolute p-1 cursor-pointer",
-                                                          selectedItemId === t.id ? "ring-2 ring-primary ring-offset-2 z-10" : ""
-                                                        )}
-                                                        style={{
-                                                            left: `${left}%`,
-                                                            top: `${top}%`,
-                                                            fontSize: `${(t.fontSize / pageInfo.height) * 100 * (1 / (pageInfo.height / 842))}em`, // Approximate scaling
-                                                            color: `rgb(${t.color.r * 255}, ${t.color.g * 255}, ${t.color.b * 255})`,
-                                                            lineHeight: 1,
-                                                            whiteSpace: 'pre',
-                                                        }}
-                                                         onClick={(e) => { e.stopPropagation(); setSelectedItemId(t.id); }}
-                                                    >
-                                                        {t.text}
-                                                    </div>
-                                                );
-                                            }
-                                            return null;
-                                        })}
-                                    </div>
-                                    <p className="text-xs text-muted-foreground mt-1">Page {index + 1}</p>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                    <div>
-                        <PropertiesPanel />
-                    </div>
+                                      {/* Floating Toolbar Logic */}
+                                      {selectedItem && selectedItem.pageIndex === index && (
+                                        <div
+                                            className="absolute z-20"
+                                            style={{
+                                                top: `calc(${100 - ((selectedItem.y + (selectedItem.type === 'text' ? selectedItem.fontSize : selectedItem.height)) / pageInfo.height) * 100}% - 50px)`,
+                                                left: `${(selectedItem.x / pageInfo.width) * 100}%`,
+                                            }}
+                                        >
+                                            <FloatingToolbar
+                                                item={selectedItem}
+                                                updateItem={updateItem}
+                                                deleteItem={handleDeleteItem}
+                                                duplicateItem={handleDuplicateItem}
+                                            />
+                                        </div>
+                                      )}
+
+                                  </div>
+                                  <p className="text-xs text-muted-foreground mt-1">Page {index + 1}</p>
+                              </div>
+                          ))}
+                      </div>
                   </div>
                 </CardContent>
             </Card>
