@@ -8,51 +8,27 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { FilePenLine, UploadCloud, Loader2, FileDown, Eraser, Trash2, Type, Palette, Copy, Undo, Redo, ImagePlus } from 'lucide-react';
+import { FilePenLine, UploadCloud, Loader2, FileDown, Trash2, Type, Undo, Redo, Copy } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import { cn } from '@/lib/utils';
 import { useHistoryState } from '@/hooks/useHistory';
 
 // State types
-type EditMode = 'whiteout' | 'text';
-
-type Redaction = {
-  id: string;
-  type: 'redaction';
-  pageIndex: number;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  color: { r: number; g: number; b: number };
-  opacity: number;
-};
-
 type TextAddition = {
   id: string;
   type: 'text';
   pageIndex: number;
   x: number;
   y: number;
+  width: number; // For bounding box
+  height: number; // For bounding box
   text: string;
   fontSize: number;
   color: { r: number; g: number; b: number };
 };
 
-type ImageAddition = {
-  id: string;
-  type: 'image';
-  pageIndex: number;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  dataUrl: string;
-  fileType: 'image/jpeg' | 'image/png';
-};
-
-type EditableItem = Redaction | TextAddition | ImageAddition;
+type EditableItem = TextAddition;
 
 type PageInfo = {
   previewUrl: string;
@@ -85,71 +61,38 @@ const FloatingToolbar = ({
   item,
   updateItem,
   deleteItem,
-  duplicateItem,
 }: {
   item: EditableItem;
   updateItem: (itemId: string, newProps: Partial<EditableItem>) => void;
   deleteItem: (itemId: string) => void;
-  duplicateItem: (itemId: string) => void;
 }) => {
   return (
     <div className="flex items-center gap-1 p-1 bg-white rounded-md shadow-lg border border-gray-300">
       {item.type === 'text' && (
-        <div className="flex items-center gap-1 px-1">
-          <Label htmlFor="font-size" className="text-xs">Size:</Label>
-          <Input
-            id="font-size"
-            type="number"
-            value={Math.round(item.fontSize)}
-            onClick={(e) => e.stopPropagation()}
-            onChange={(e) => updateItem(item.id, { fontSize: parseInt(e.target.value, 10) || 1 })}
-            className="w-16 h-8 text-xs"
-          />
-        </div>
-      )}
-      {(item.type === 'redaction' || item.type === 'image') && (
         <>
           <div className="flex items-center gap-1 px-1">
-            <Label htmlFor="width" className="text-xs">W:</Label>
+            <Label htmlFor="font-size" className="text-xs">Size:</Label>
             <Input
-              id="width"
+              id="font-size"
               type="number"
-              value={Math.round(item.width)}
+              value={Math.round(item.fontSize)}
               onClick={(e) => e.stopPropagation()}
-              onChange={(e) => updateItem(item.id, { width: parseInt(e.target.value, 10) || 0 })}
+              onChange={(e) => updateItem(item.id, { fontSize: parseInt(e.target.value, 10) || 1 })}
               className="w-16 h-8 text-xs"
             />
           </div>
-          <div className="flex items-center gap-1 px-1">
-            <Label htmlFor="height" className="text-xs">H:</Label>
+          <div className="p-1">
             <Input
-              id="height"
-              type="number"
-              value={Math.round(item.height)}
+              type="color"
+              aria-label="Color"
+              value={rgbToHex(item.color)}
               onClick={(e) => e.stopPropagation()}
-              onChange={(e) => updateItem(item.id, { height: parseInt(e.target.value, 10) || 0 })}
-              className="w-16 h-8 text-xs"
+              onChange={(e) => updateItem(item.id, { color: hexToRgb(e.target.value) })}
+              className="h-7 w-7 p-0.5 border-none cursor-pointer"
             />
           </div>
         </>
       )}
-
-      {item.type !== 'image' && (
-         <div className="p-1">
-          <Input
-            type="color"
-            aria-label="Color"
-            value={rgbToHex(item.color)}
-            onClick={(e) => e.stopPropagation()}
-            onChange={(e) => updateItem(item.id, { color: hexToRgb(e.target.value) })}
-            className="h-7 w-7 p-0.5 border-none cursor-pointer"
-          />
-        </div>
-      )}
-
-      <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); duplicateItem(item.id); }} className="h-8 w-8" aria-label="Duplicate">
-        <Copy size={16} />
-      </Button>
       <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); deleteItem(item.id); }} className="text-destructive h-8 w-8" aria-label="Delete">
         <Trash2 size={16} />
       </Button>
@@ -167,10 +110,9 @@ export default function PdfEditPage() {
   const { state: items, setState: setItems, undo, redo, canUndo, canRedo, resetHistory: resetItems } = useHistoryState<EditableItem[]>([]);
   
   const [editedPdfUrl, setEditedPdfUrl] = useState<string | null>(null);
-  const [editMode, setEditMode] = useState<EditMode>('whiteout');
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
 
-  const imageInputRef = useRef<HTMLInputElement>(null);
+  const editableItemRefs = useRef<{[key: string]: HTMLDivElement | null}>({});
 
   useEffect(() => {
     pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
@@ -186,7 +128,6 @@ export default function PdfEditPage() {
       URL.revokeObjectURL(editedPdfUrl);
     }
     setEditedPdfUrl(null);
-    setEditMode('whiteout');
     setSelectedItemId(null);
   }
 
@@ -248,88 +189,34 @@ export default function PdfEditPage() {
 
     const target = event.currentTarget;
     const rect = target.getBoundingClientRect();
-    const renderedWidth = target.clientWidth;
     
     const clickX = event.clientX - rect.left;
     const clickY = event.clientY - rect.top;
 
-    const scaleX = pageInfo.width / renderedWidth;
-    const scaleY = pageInfo.height / (target.clientHeight);
-
-    if (editMode === 'whiteout') {
-        const redactionWidth = 150;
-        const redactionHeight = 30;
-        const pdfX = clickX * scaleX - (redactionWidth / 2);
-        const pdfY = pageInfo.height - (clickY * scaleY) - (redactionHeight / 2);
-        
-        const newRedaction: Redaction = {
-            id: `redact-${Date.now()}`,
-            type: 'redaction',
-            pageIndex,
-            x: pdfX,
-            y: pdfY,
-            width: redactionWidth,
-            height: redactionHeight,
-            color: { r: 1, g: 1, b: 1 },
-            opacity: 1,
-        };
-        setItems(prev => [...prev, newRedaction]);
-        setSelectedItemId(newRedaction.id);
-    } else if (editMode === 'text') {
-        const text = window.prompt("Enter the text to add:");
-        if (text) {
-            const fontSize = 18;
-            const pdfX = clickX * scaleX;
-            const pdfY = pageInfo.height - (clickY * scaleY) - (fontSize / 2);
-            
-            const newTextAddition: TextAddition = {
-                id: `text-${Date.now()}`,
-                type: 'text',
-                pageIndex,
-                text,
-                x: pdfX,
-                y: pdfY,
-                fontSize: fontSize,
-                color: { r: 0, g: 0, b: 0 },
-            };
-            setItems(prev => [...prev, newTextAddition]);
-            setSelectedItemId(newTextAddition.id);
-        }
-    }
-  };
-  
-  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const imageFile = event.target.files?.[0];
-    if (!imageFile || !pageInfos.length) return;
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        const dataUrl = e.target?.result as string;
-        const img = new window.Image();
-        img.onload = () => {
-            const pageInfo = pageInfos[0];
-            const newImage: ImageAddition = {
-                id: `image-${Date.now()}`,
-                type: 'image',
-                pageIndex: 0,
-                x: 50,
-                y: pageInfo.height - 50 - 100, // Position from top
-                width: 150,
-                height: (150 / img.width) * img.height,
-                dataUrl,
-                fileType: imageFile.type as 'image/jpeg' | 'image/png',
-            };
-            setItems(prev => [...prev, newImage]);
-            setSelectedItemId(newImage.id);
-        };
-        img.src = dataUrl;
+    const scaleX = pageInfo.width / rect.width;
+    const scaleY = pageInfo.height / rect.height;
+    
+    const pdfX = clickX * scaleX;
+    const pdfY = pageInfo.height - (clickY * scaleY);
+    
+    const newText: TextAddition = {
+        id: `text-${Date.now()}`,
+        type: 'text',
+        pageIndex,
+        x: pdfX,
+        y: pdfY,
+        width: 150,
+        height: 20,
+        text: 'Sample Text',
+        fontSize: 18,
+        color: { r: 0, g: 0, b: 0 },
     };
-    reader.readAsDataURL(imageFile);
-    event.target.value = ''; // Reset input
+    setItems(prev => [...prev, newText]);
+    setSelectedItemId(newText.id);
   };
   
   const updateItem = (itemId: string, newProps: Partial<EditableItem>) => {
-    setItems(prev => prev.map(item => item.id === itemId ? { ...item, ...newProps } : item));
+    setItems(prevItems => prevItems.map(item => item.id === itemId ? { ...item, ...newProps } : item));
   };
   
   const handleDeleteItem = (itemId: string) => {
@@ -337,21 +224,6 @@ export default function PdfEditPage() {
       setSelectedItemId(null);
     }
     setItems(prev => prev.filter(item => item.id !== itemId));
-  };
-  
-  const handleDuplicateItem = (itemId: string) => {
-    const itemToDuplicate = items.find((item) => item.id === itemId);
-    if (!itemToDuplicate) return;
-
-    const newItem: EditableItem = {
-      ...itemToDuplicate,
-      id: `${itemToDuplicate.type}-${Date.now()}`,
-      x: itemToDuplicate.x + 20,
-      y: itemToDuplicate.y - 20,
-    };
-
-    setItems((prev) => [...prev, newItem]);
-    setSelectedItemId(newItem.id);
   };
 
   const handleApplyChanges = async () => {
@@ -371,40 +243,17 @@ export default function PdfEditPage() {
 
         for (const item of items) {
             const page = pages[item.pageIndex];
-            if (!page) continue;
+            if (!page || item.type !== 'text') continue;
 
-            if(item.type === 'redaction') {
-                page.drawRectangle({
-                    x: item.x,
-                    y: item.y,
-                    width: item.width,
-                    height: item.height,
-                    color: rgb(item.color.r, item.color.g, item.color.b),
-                    opacity: item.opacity,
-                });
-            } else if (item.type === 'text') {
-                page.drawText(item.text, {
-                    x: item.x,
-                    y: item.y,
-                    font: helveticaFont,
-                    size: item.fontSize,
-                    color: rgb(item.color.r, item.color.g, item.color.b),
-                });
-            } else if (item.type === 'image') {
-                const imageBytes = await fetch(item.dataUrl).then(res => res.arrayBuffer());
-                let pdfImage;
-                if (item.fileType === 'image/png') {
-                    pdfImage = await pdfDoc.embedPng(imageBytes);
-                } else {
-                    pdfImage = await pdfDoc.embedJpg(imageBytes);
-                }
-                page.drawImage(pdfImage, {
-                    x: item.x,
-                    y: item.y,
-                    width: item.width,
-                    height: item.height,
-                });
-            }
+            page.drawText(item.text, {
+                x: item.x,
+                y: item.y - item.fontSize, // Adjust for baseline
+                font: helveticaFont,
+                size: item.fontSize,
+                color: rgb(item.color.r, item.color.g, item.color.b),
+                lineHeight: item.fontSize * 1.2,
+                maxWidth: item.width,
+            });
         }
         
         const newPdfBytes = await pdfDoc.save();
@@ -425,16 +274,9 @@ export default function PdfEditPage() {
   const EditorToolbar = () => (
     <div className="bg-muted p-2 rounded-md flex items-center justify-between gap-2 flex-wrap">
       <div className="flex items-center gap-2">
-        <Button variant={editMode === 'text' ? 'default' : 'outline'} size="sm" onClick={() => setEditMode('text')}>
+        <Button variant={'default'} size="sm">
           <Type className="mr-2 h-4 w-4" /> Text
         </Button>
-        <Button variant={editMode === 'whiteout' ? 'default' : 'outline'} size="sm" onClick={() => setEditMode('whiteout')}>
-          <Eraser className="mr-2 h-4 w-4" /> Whiteout
-        </Button>
-        <Button variant="outline" size="sm" onClick={() => imageInputRef.current?.click()}>
-          <ImagePlus className="mr-2 h-4 w-4" /> Add Image
-        </Button>
-        <Input type="file" ref={imageInputRef} onChange={handleImageUpload} className="hidden" accept="image/png, image/jpeg" />
       </div>
       <div className="flex items-center gap-2">
         <Button variant="outline" size="icon" onClick={undo} disabled={!canUndo} aria-label="Undo">
@@ -454,7 +296,7 @@ export default function PdfEditPage() {
           <FilePenLine size={32} /> PDF Editor
         </h1>
         <p className="text-muted-foreground">
-          Upload a PDF to add text, images, or whiteout boxes. Click an item to edit it.
+          Upload a PDF to add text. Click on the page to add text, then click the text to edit or style it.
         </p>
       </header>
 
@@ -487,7 +329,7 @@ export default function PdfEditPage() {
             <Card className="shadow-lg">
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">2. Edit Your PDF</CardTitle>
-                    <CardDescription>Use the toolbar to select a tool, then click on a page. Click an item to select it and show its properties.</CardDescription>
+                    <CardDescription>Click on a page to add text. Click an existing text box to edit it.</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4 bg-muted/30 p-4 rounded-lg">
@@ -496,7 +338,7 @@ export default function PdfEditPage() {
                           {pageInfos.map((pageInfo, index) => (
                               <div key={index} className="flex flex-col items-center">
                                   <div 
-                                      className="relative w-full max-w-4xl mx-auto cursor-crosshair"
+                                      className="relative w-full max-w-4xl mx-auto cursor-text"
                                       onClick={(e) => handlePageClick(index, e)}
                                       onMouseDown={(e) => {
                                         if (selectedItemId && (e.target as HTMLElement).closest('[data-editable-item="true"]') === null) {
@@ -516,92 +358,53 @@ export default function PdfEditPage() {
                                           
                                           const scaleX = (100 / pageInfo.width);
                                           const scaleY = (100 / pageInfo.height);
-                                          
-                                          const baseStyle: React.CSSProperties = {
-                                            left: `${item.x * scaleX}%`,
-                                            top: `${100 - (item.y + item.height) * scaleY}%`,
-                                            width: `${item.width * scaleX}%`,
-                                            height: `${item.height * scaleY}%`,
-                                          };
-                                          if (item.type === 'text') {
-                                            baseStyle.top = `${100 - (item.y + item.fontSize) * scaleY}%`;
-                                            baseStyle.width = 'auto';
-                                            baseStyle.height = 'auto';
-                                          }
-                                          
-                                          if (item.type === 'redaction') {
-                                              return (
-                                                  <div
-                                                      key={item.id}
-                                                      data-editable-item="true"
-                                                      className={cn(
-                                                        "absolute border-2 cursor-pointer",
-                                                        selectedItemId === item.id ? "border-primary z-10" : "border-transparent hover:border-primary/50"
-                                                      )}
-                                                      style={{
-                                                          ...baseStyle,
-                                                          backgroundColor: `rgba(${item.color.r * 255}, ${item.color.g * 255}, ${item.color.b * 255}, ${item.opacity})`,
-                                                      }}
-                                                      onClick={(e) => { e.stopPropagation(); setSelectedItemId(item.id); }}
-                                                  />
-                                              );
-                                          }
 
-                                          if (item.type === 'text') {
-                                              return (
-                                                  <div
-                                                      key={item.id}
-                                                      data-editable-item="true"
-                                                      className={cn(
-                                                        "absolute p-1 cursor-pointer select-none",
-                                                        selectedItemId === item.id ? "ring-2 ring-primary ring-offset-background z-10" : "hover:ring-1 hover:ring-primary/50"
-                                                      )}
-                                                      style={{
-                                                          ...baseStyle,
-                                                          fontSize: `${(item.fontSize / pageInfo.height) * 100 * (1 / (pageInfo.height / 842))}em`,
-                                                          color: `rgb(${item.color.r * 255}, ${item.color.g * 255}, ${item.color.b * 255})`,
-                                                          lineHeight: 1,
-                                                          whiteSpace: 'pre',
-                                                      }}
-                                                       onClick={(e) => { e.stopPropagation(); setSelectedItemId(item.id); }}
-                                                  >
-                                                      {item.text}
-                                                  </div>
-                                              );
-                                          }
+                                          const itemStyle: React.CSSProperties = {
+                                              left: `${item.x * scaleX}%`,
+                                              top: `${(pageInfo.height - item.y) * scaleY}%`,
+                                              fontSize: `${(item.fontSize / pageInfo.height) * 100 * (1 / (pageInfo.height / 842))}em`, // Adjust font size relative to container
+                                              color: `rgb(${item.color.r * 255}, ${item.color.g * 255}, ${item.color.b * 255})`,
+                                              minWidth: `${item.width * scaleX}%`,
+                                              minHeight: `${item.height * scaleY}%`,
+                                          };
                                           
-                                          if (item.type === 'image') {
-                                            return (
-                                                <div
-                                                    key={item.id}
-                                                    data-editable-item="true"
-                                                    className={cn(
-                                                      "absolute border-2 cursor-pointer overflow-hidden",
-                                                      selectedItemId === item.id ? "border-primary z-10" : "border-transparent hover:border-primary/50"
-                                                    )}
-                                                    style={baseStyle}
-                                                    onClick={(e) => { e.stopPropagation(); setSelectedItemId(item.id); }}
-                                                >
-                                                    <Image src={item.dataUrl} alt="user uploaded content" layout="fill" objectFit="contain" />
-                                                </div>
-                                            );
-                                          }
-                                          return null;
+                                          return (
+                                              <div
+                                                  key={item.id}
+                                                  ref={(el) => editableItemRefs.current[item.id] = el}
+                                                  data-editable-item="true"
+                                                  className={cn(
+                                                    "absolute p-1 cursor-move select-none whitespace-pre-wrap break-words",
+                                                    selectedItemId === item.id ? "ring-2 ring-primary ring-offset-background z-10" : "hover:ring-1 hover:ring-primary/50"
+                                                  )}
+                                                  style={itemStyle}
+                                                  contentEditable={selectedItemId === item.id}
+                                                  suppressContentEditableWarning={true}
+                                                  onClick={(e) => { e.stopPropagation(); setSelectedItemId(item.id); }}
+                                                  onBlur={(e) => {
+                                                    const currentText = e.currentTarget.innerText;
+                                                    if(item.text !== currentText) {
+                                                      updateItem(item.id, { text: currentText });
+                                                    }
+                                                  }}
+                                              >
+                                                  {item.text}
+                                              </div>
+                                          );
                                       })}
 
                                       {selectedItem && selectedItem.pageIndex === index && (
                                         <div
                                             className="absolute z-20"
                                             style={{
-                                                top: `calc(${100 - ((selectedItem.y + (selectedItem.type === 'text' ? selectedItem.fontSize : selectedItem.height)) / pageInfo.height) * 100}% - 50px)`,
-                                                left: `${(selectedItem.x / pageInfo.width) * 100}%`,
+                                                top: `calc(${(pageInfo.height - selectedItem.y) * scaleY}% - 50px)`,
+                                                left: `${selectedItem.x * scaleX}%`,
                                             }}
                                         >
                                             <FloatingToolbar
                                                 item={selectedItem}
                                                 updateItem={updateItem}
                                                 deleteItem={handleDeleteItem}
-                                                duplicateItem={handleDuplicateItem}
                                             />
                                         </div>
                                       )}
@@ -630,7 +433,7 @@ export default function PdfEditPage() {
                     </Button>
                     {editedPdfUrl && (
                         <Button asChild variant="secondary">
-                        <a href={editedPdfUrl} download={`edited-${file.name}`}>
+                        <a href={editedPdfUrl} download={`edited-${file?.name || 'document.pdf'}`}>
                             <FileDown className="mr-2 h-4 w-4" />
                             Download Edited PDF
                         </a>
@@ -644,3 +447,5 @@ export default function PdfEditPage() {
     </div>
   );
 }
+
+    
