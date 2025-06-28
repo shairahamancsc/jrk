@@ -84,7 +84,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
     const { data, error } = await supabase
-      .from('customers')
+      .from('customer_profiles')
       .select('*')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false });
@@ -126,7 +126,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         return null;
     }
     const { data, error } = await supabase
-        .from('customers')
+        .from('customer_profiles')
         .select('*')
         .eq('id', profileId)
         .eq('user_id', user.id)
@@ -475,13 +475,13 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     }
     setIsLoading(true);
 
-    const profileToInsert: Database['public']['Tables']['customers']['Insert'] = {
+    const profileToInsert: Database['public']['Tables']['customer_profiles']['Insert'] = {
       user_id: user.id,
       ...profileData,
     };
     
     const { data, error } = await supabase
-      .from('customers')
+      .from('customer_profiles')
       .insert(profileToInsert)
       .select()
       .single();
@@ -504,7 +504,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     setIsLoading(true);
 
     const { error } = await supabase
-      .from('customers')
+      .from('customer_profiles')
       .update(profileData)
       .eq('id', profileId)
       .eq('user_id', user.id);
@@ -534,7 +534,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     setIsLoading(true);
     try {
       const { error: dbError } = await supabase
-        .from('customers')
+        .from('customer_profiles')
         .delete()
         .eq('id', profileId)
         .eq('user_id', user.id);

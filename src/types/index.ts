@@ -79,7 +79,7 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      customers: {
+      customer_profiles: {
         Row: {
           id: string
           user_id: string
@@ -121,7 +121,7 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "customers_user_id_fkey"
+            foreignKeyName: "customer_profiles_user_id_fkey"
             columns: ["user_id"]
             referencedRelation: "users"
             referencedColumns: ["id"]
