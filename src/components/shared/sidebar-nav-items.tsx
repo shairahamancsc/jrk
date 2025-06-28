@@ -11,7 +11,6 @@ import {
   UserPlus, 
   Banknote,
   Wrench,
-  Briefcase,
 } from 'lucide-react';
 import {
   SidebarMenu,
@@ -24,7 +23,6 @@ import { Button } from '@/components/ui/button';
 const navItemsBase = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/labor', label: 'Labor Profiles', icon: Users },
-  { href: '/customers', label: 'Customers', icon: Briefcase },
   { href: '/attendance', label: 'Daily Attendance', icon: CalendarCheck },
   { href: '/payment-reports', label: 'Payment Reports', icon: Banknote },
   { href: '/tools', label: 'Tools', icon: Wrench },
