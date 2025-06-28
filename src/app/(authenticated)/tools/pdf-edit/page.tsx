@@ -1,17 +1,18 @@
 
 "use client";
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { FilePenLine, UploadCloud, Loader2, FileDown, Eraser, Trash2, Type, Palette, Copy } from 'lucide-react';
+import { FilePenLine, UploadCloud, Loader2, FileDown, Eraser, Trash2, Type, Palette, Copy, Undo, Redo, ImagePlus } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import { cn } from '@/lib/utils';
+import { useHistoryState } from '@/hooks/useHistory';
 
 // State types
 type EditMode = 'whiteout' | 'text';
@@ -39,7 +40,19 @@ type TextAddition = {
   color: { r: number; g: number; b: number };
 };
 
-type EditableItem = Redaction | TextAddition;
+type ImageAddition = {
+  id: string;
+  type: 'image';
+  pageIndex: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  dataUrl: string;
+  fileType: 'image/jpeg' | 'image/png';
+};
+
+type EditableItem = Redaction | TextAddition | ImageAddition;
 
 type PageInfo = {
   previewUrl: string;
@@ -50,12 +63,11 @@ type PageInfo = {
 // Helper functions for color conversion
 const hexToRgb = (hex: string): { r: number; g: number; b: number } => {
     let r = 0, g = 0, b = 0;
-    // 3 digits
     if (hex.length === 4) {
         r = parseInt(hex[1] + hex[1], 16);
         g = parseInt(hex[2] + hex[2], 16);
         b = parseInt(hex[3] + hex[3], 16);
-    } else if (hex.length === 7) { // 6 digits
+    } else if (hex.length === 7) {
         r = parseInt(hex.slice(1, 3), 16);
         g = parseInt(hex.slice(3, 5), 16);
         b = parseInt(hex.slice(5, 7), 16);
@@ -95,7 +107,7 @@ const FloatingToolbar = ({
           />
         </div>
       )}
-      {item.type === 'redaction' && (
+      {(item.type === 'redaction' || item.type === 'image') && (
         <>
           <div className="flex items-center gap-1 px-1">
             <Label htmlFor="width" className="text-xs">W:</Label>
@@ -122,16 +134,18 @@ const FloatingToolbar = ({
         </>
       )}
 
-      <div className="p-1">
-        <Input
-          type="color"
-          aria-label="Color"
-          value={rgbToHex(item.color)}
-          onClick={(e) => e.stopPropagation()}
-          onChange={(e) => updateItem(item.id, { color: hexToRgb(e.target.value) })}
-          className="h-7 w-7 p-0.5 border-none cursor-pointer"
-        />
-      </div>
+      {item.type !== 'image' && (
+         <div className="p-1">
+          <Input
+            type="color"
+            aria-label="Color"
+            value={rgbToHex(item.color)}
+            onClick={(e) => e.stopPropagation()}
+            onChange={(e) => updateItem(item.id, { color: hexToRgb(e.target.value) })}
+            className="h-7 w-7 p-0.5 border-none cursor-pointer"
+          />
+        </div>
+      )}
 
       <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); duplicateItem(item.id); }} className="h-8 w-8" aria-label="Duplicate">
         <Copy size={16} />
@@ -150,10 +164,13 @@ export default function PdfEditPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   
   const [pageInfos, setPageInfos] = useState<PageInfo[]>([]);
-  const [items, setItems] = useState<EditableItem[]>([]);
+  const { state: items, setState: setItems, undo, redo, canUndo, canRedo, resetHistory: resetItems } = useHistoryState<EditableItem[]>([]);
+  
   const [editedPdfUrl, setEditedPdfUrl] = useState<string | null>(null);
   const [editMode, setEditMode] = useState<EditMode>('whiteout');
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
@@ -164,7 +181,7 @@ export default function PdfEditPage() {
     setIsProcessing(false);
     pageInfos.forEach(p => URL.revokeObjectURL(p.previewUrl));
     setPageInfos([]);
-    setItems([]);
+    resetItems([]);
     if (editedPdfUrl) {
       URL.revokeObjectURL(editedPdfUrl);
     }
@@ -222,7 +239,6 @@ export default function PdfEditPage() {
   };
   
   const handlePageClick = (pageIndex: number, event: React.MouseEvent<HTMLDivElement>) => {
-    // Prevent adding new items if a selected item was clicked
     if ((event.target as HTMLElement).closest('[data-editable-item="true"]')) {
       return;
     }
@@ -262,7 +278,7 @@ export default function PdfEditPage() {
     } else if (editMode === 'text') {
         const text = window.prompt("Enter the text to add:");
         if (text) {
-            const fontSize = 18; // Default font size in PDF units
+            const fontSize = 18;
             const pdfX = clickX * scaleX;
             const pdfY = pageInfo.height - (clickY * scaleY) - (fontSize / 2);
             
@@ -274,12 +290,46 @@ export default function PdfEditPage() {
                 x: pdfX,
                 y: pdfY,
                 fontSize: fontSize,
-                color: { r: 0, g: 0, b: 0 }, // Black
+                color: { r: 0, g: 0, b: 0 },
             };
             setItems(prev => [...prev, newTextAddition]);
             setSelectedItemId(newTextAddition.id);
         }
     }
+  };
+  
+  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const imageFile = event.target.files?.[0];
+    if (!imageFile || !pageInfos.length) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const dataUrl = e.target?.result as string;
+        const img = new window.Image();
+        img.onload = () => {
+            const pageInfo = pageInfos[0];
+            const newImage: ImageAddition = {
+                id: `image-${Date.now()}`,
+                type: 'image',
+                pageIndex: 0,
+                x: 50,
+                y: pageInfo.height - 50 - 100, // Position from top
+                width: 150,
+                height: (150 / img.width) * img.height,
+                dataUrl,
+                fileType: imageFile.type as 'image/jpeg' | 'image/png',
+            };
+            setItems(prev => [...prev, newImage]);
+            setSelectedItemId(newImage.id);
+        };
+        img.src = dataUrl;
+    };
+    reader.readAsDataURL(imageFile);
+    event.target.value = ''; // Reset input
+  };
+  
+  const updateItem = (itemId: string, newProps: Partial<EditableItem>) => {
+    setItems(prev => prev.map(item => item.id === itemId ? { ...item, ...newProps } : item));
   };
   
   const handleDeleteItem = (itemId: string) => {
@@ -296,16 +346,12 @@ export default function PdfEditPage() {
     const newItem: EditableItem = {
       ...itemToDuplicate,
       id: `${itemToDuplicate.type}-${Date.now()}`,
-      x: itemToDuplicate.x + 20, // Offset a bit
-      y: itemToDuplicate.y - 20, // Offset a bit
+      x: itemToDuplicate.x + 20,
+      y: itemToDuplicate.y - 20,
     };
 
     setItems((prev) => [...prev, newItem]);
     setSelectedItemId(newItem.id);
-  };
-
-  const updateItem = (itemId: string, newProps: Partial<EditableItem>) => {
-    setItems(prev => prev.map(item => item.id === itemId ? { ...item, ...newProps } : item));
   };
 
   const handleApplyChanges = async () => {
@@ -323,9 +369,9 @@ export default function PdfEditPage() {
         const pages = pdfDoc.getPages();
         const helveticaFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
-        items.forEach(item => {
+        for (const item of items) {
             const page = pages[item.pageIndex];
-            if (!page) return;
+            if (!page) continue;
 
             if(item.type === 'redaction') {
                 page.drawRectangle({
@@ -344,8 +390,22 @@ export default function PdfEditPage() {
                     size: item.fontSize,
                     color: rgb(item.color.r, item.color.g, item.color.b),
                 });
+            } else if (item.type === 'image') {
+                const imageBytes = await fetch(item.dataUrl).then(res => res.arrayBuffer());
+                let pdfImage;
+                if (item.fileType === 'image/png') {
+                    pdfImage = await pdfDoc.embedPng(imageBytes);
+                } else {
+                    pdfImage = await pdfDoc.embedJpg(imageBytes);
+                }
+                page.drawImage(pdfImage, {
+                    x: item.x,
+                    y: item.y,
+                    width: item.width,
+                    height: item.height,
+                });
             }
-        });
+        }
         
         const newPdfBytes = await pdfDoc.save();
         const blob = new Blob([newPdfBytes], { type: 'application/pdf' });
@@ -363,13 +423,25 @@ export default function PdfEditPage() {
   const selectedItem = items.find(item => item.id === selectedItemId) || null;
   
   const EditorToolbar = () => (
-    <div className="bg-muted p-2 rounded-md flex items-center justify-between gap-2">
+    <div className="bg-muted p-2 rounded-md flex items-center justify-between gap-2 flex-wrap">
       <div className="flex items-center gap-2">
         <Button variant={editMode === 'text' ? 'default' : 'outline'} size="sm" onClick={() => setEditMode('text')}>
           <Type className="mr-2 h-4 w-4" /> Text
         </Button>
         <Button variant={editMode === 'whiteout' ? 'default' : 'outline'} size="sm" onClick={() => setEditMode('whiteout')}>
           <Eraser className="mr-2 h-4 w-4" /> Whiteout
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => imageInputRef.current?.click()}>
+          <ImagePlus className="mr-2 h-4 w-4" /> Add Image
+        </Button>
+        <Input type="file" ref={imageInputRef} onChange={handleImageUpload} className="hidden" accept="image/png, image/jpeg" />
+      </div>
+      <div className="flex items-center gap-2">
+        <Button variant="outline" size="icon" onClick={undo} disabled={!canUndo} aria-label="Undo">
+            <Undo className="h-4 w-4" />
+        </Button>
+        <Button variant="outline" size="icon" onClick={redo} disabled={!canRedo} aria-label="Redo">
+            <Redo className="h-4 w-4" />
         </Button>
       </div>
     </div>
@@ -382,7 +454,7 @@ export default function PdfEditPage() {
           <FilePenLine size={32} /> PDF Editor
         </h1>
         <p className="text-muted-foreground">
-          Upload a PDF to add text or whiteout boxes. Click an item to edit it.
+          Upload a PDF to add text, images, or whiteout boxes. Click an item to edit it.
         </p>
       </header>
 
@@ -426,13 +498,9 @@ export default function PdfEditPage() {
                                   <div 
                                       className="relative w-full max-w-4xl mx-auto cursor-crosshair"
                                       onClick={(e) => handlePageClick(index, e)}
-                                      onMouseDown={() => {
-                                        // Deselect when clicking on page background
-                                        if (selectedItemId) {
-                                           const target = event?.target as HTMLElement;
-                                           if (target.closest('[data-editable-item="true"]') === null) {
-                                             setSelectedItemId(null);
-                                           }
+                                      onMouseDown={(e) => {
+                                        if (selectedItemId && (e.target as HTMLElement).closest('[data-editable-item="true"]') === null) {
+                                           setSelectedItemId(null);
                                         }
                                       }}
                                   >
@@ -449,56 +517,78 @@ export default function PdfEditPage() {
                                           const scaleX = (100 / pageInfo.width);
                                           const scaleY = (100 / pageInfo.height);
                                           
+                                          const baseStyle: React.CSSProperties = {
+                                            left: `${item.x * scaleX}%`,
+                                            top: `${100 - (item.y + item.height) * scaleY}%`,
+                                            width: `${item.width * scaleX}%`,
+                                            height: `${item.height * scaleY}%`,
+                                          };
+                                          if (item.type === 'text') {
+                                            baseStyle.top = `${100 - (item.y + item.fontSize) * scaleY}%`;
+                                            baseStyle.width = 'auto';
+                                            baseStyle.height = 'auto';
+                                          }
+                                          
                                           if (item.type === 'redaction') {
-                                              const r = item;
                                               return (
                                                   <div
-                                                      key={r.id}
+                                                      key={item.id}
                                                       data-editable-item="true"
                                                       className={cn(
                                                         "absolute border-2 cursor-pointer",
-                                                        selectedItemId === r.id ? "border-primary z-10" : "border-transparent hover:border-primary/50"
+                                                        selectedItemId === item.id ? "border-primary z-10" : "border-transparent hover:border-primary/50"
                                                       )}
                                                       style={{
-                                                          left: `${r.x * scaleX}%`,
-                                                          top: `${100 - (r.y + r.height) * scaleY}%`,
-                                                          width: `${r.width * scaleX}%`,
-                                                          height: `${r.height * scaleY}%`,
-                                                          backgroundColor: `rgba(${r.color.r * 255}, ${r.color.g * 255}, ${r.color.b * 255}, ${r.opacity})`,
+                                                          ...baseStyle,
+                                                          backgroundColor: `rgba(${item.color.r * 255}, ${item.color.g * 255}, ${item.color.b * 255}, ${item.opacity})`,
                                                       }}
-                                                      onClick={(e) => { e.stopPropagation(); setSelectedItemId(r.id); }}
+                                                      onClick={(e) => { e.stopPropagation(); setSelectedItemId(item.id); }}
                                                   />
                                               );
                                           }
 
                                           if (item.type === 'text') {
-                                              const t = item;
                                               return (
                                                   <div
-                                                      key={t.id}
+                                                      key={item.id}
                                                       data-editable-item="true"
                                                       className={cn(
                                                         "absolute p-1 cursor-pointer select-none",
-                                                        selectedItemId === t.id ? "ring-2 ring-primary ring-offset-background z-10" : "hover:ring-1 hover:ring-primary/50"
+                                                        selectedItemId === item.id ? "ring-2 ring-primary ring-offset-background z-10" : "hover:ring-1 hover:ring-primary/50"
                                                       )}
                                                       style={{
-                                                          left: `${t.x * scaleX}%`,
-                                                          top: `${100 - (t.y + t.fontSize) * scaleY}%`,
-                                                          fontSize: `${(t.fontSize / pageInfo.height) * 100 * (1 / (pageInfo.height / 842))}em`, // Approximate scaling
-                                                          color: `rgb(${t.color.r * 255}, ${t.color.g * 255}, ${t.color.b * 255})`,
+                                                          ...baseStyle,
+                                                          fontSize: `${(item.fontSize / pageInfo.height) * 100 * (1 / (pageInfo.height / 842))}em`,
+                                                          color: `rgb(${item.color.r * 255}, ${item.color.g * 255}, ${item.color.b * 255})`,
                                                           lineHeight: 1,
                                                           whiteSpace: 'pre',
                                                       }}
-                                                       onClick={(e) => { e.stopPropagation(); setSelectedItemId(t.id); }}
+                                                       onClick={(e) => { e.stopPropagation(); setSelectedItemId(item.id); }}
                                                   >
-                                                      {t.text}
+                                                      {item.text}
                                                   </div>
                                               );
+                                          }
+                                          
+                                          if (item.type === 'image') {
+                                            return (
+                                                <div
+                                                    key={item.id}
+                                                    data-editable-item="true"
+                                                    className={cn(
+                                                      "absolute border-2 cursor-pointer overflow-hidden",
+                                                      selectedItemId === item.id ? "border-primary z-10" : "border-transparent hover:border-primary/50"
+                                                    )}
+                                                    style={baseStyle}
+                                                    onClick={(e) => { e.stopPropagation(); setSelectedItemId(item.id); }}
+                                                >
+                                                    <Image src={item.dataUrl} alt="user uploaded content" layout="fill" objectFit="contain" />
+                                                </div>
+                                            );
                                           }
                                           return null;
                                       })}
 
-                                      {/* Floating Toolbar Logic */}
                                       {selectedItem && selectedItem.pageIndex === index && (
                                         <div
                                             className="absolute z-20"
