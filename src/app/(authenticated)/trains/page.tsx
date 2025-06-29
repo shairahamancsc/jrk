@@ -1,53 +1,63 @@
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Loader2, AlertTriangle, TrainFront } from 'lucide-react';
+import { Loader2, AlertTriangle, TrainFront, ArrowRight } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
 
-interface Train {
+interface TrainRouteStop {
+    station_name: string;
+    station_code: string;
+    arrival_time: string;
+    departure_time: string;
+    day_of_journey: number;
+    distance_from_source_in_km: number;
+}
+
+interface TrainDetails {
     train_name: string;
-    train_no: string;
-    from_station_name: string;
-    to_station_name: string;
-    eta: string; // Expected Time of Arrival
-    etd: string; // Expected Time of Departure
+    train_number: string;
+    source_station_name: string;
+    destination_station_name: string;
+    running_days: string[];
+    route: TrainRouteStop[];
 }
 
 export default function TrainsPage() {
-    const [trains, setTrains] = useState<Train[]>([]);
+    const [trainDetails, setTrainDetails] = useState<TrainDetails | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [stationCode, setStationCode] = useState('BBS'); // Default station code
-    const [hours, setHours] = useState('4'); // Default hours
+    const [trainNumber, setTrainNumber] = useState('12051'); // Default train number
 
     const apiKey = process.env.NEXT_PUBLIC_RAPIDAPI_KEY;
 
-    const fetchTrains = async () => {
+    const fetchTrainDetails = async () => {
         if (!apiKey || apiKey === 'your_rapidapi_key_here') {
             setError("RapidAPI key is not configured. Please add it to your .env file.");
             setIsLoading(false);
             return;
         }
         
-        if (!stationCode) {
-            setError("Please enter a station code.");
+        if (!trainNumber) {
+            setError("Please enter a train number.");
             return;
         }
 
         setIsLoading(true);
         setError(null);
-        setTrains([]);
+        setTrainDetails(null);
 
         try {
-            const response = await fetch(`https://irctc1.p.rapidapi.com/api/v3/getLiveStation?fromStationCode=${stationCode}&hours=${hours}&lang=en`, {
+            const response = await fetch(`https://indian-railway-irctc.p.rapidapi.com/api/trains-search/v1/train/${trainNumber}`, {
                 method: 'GET',
                 headers: {
-                    'x-rapidapi-host': 'irctc1.p.rapidapi.com',
                     'x-rapidapi-key': apiKey,
+                    'x-rapidapi-host': 'indian-railway-irctc.p.rapidapi.com',
                 }
             });
 
@@ -58,16 +68,16 @@ export default function TrainsPage() {
                 } catch(e) {
                    errorData = { message: `HTTP error! status: ${response.status}` };
                 }
-                throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+                throw new Error(errorData.message || `An error occurred while fetching data. Check the train number.`);
             }
 
             const result = await response.json();
-
-            if(result.status === false) {
-                 throw new Error(result.message || "Failed to fetch data from the API. The station code might be invalid.");
+            
+            if (result.status === false || !result.data) {
+                 throw new Error(result.message || "Failed to fetch train data. The train number might be invalid.");
             }
 
-            setTrains(result.data?.train_between_stations || []);
+            setTrainDetails(result.data);
         } catch (e: any) {
             console.error("Failed to fetch train data:", e);
             setError(e.message || "An unknown error occurred.");
@@ -76,55 +86,41 @@ export default function TrainsPage() {
         }
     };
     
-    // Fetch trains for the default station on initial load
     useEffect(() => {
-        fetchTrains();
+        fetchTrainDetails();
     }, []);
 
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault();
-        fetchTrains();
+        fetchTrainDetails();
     }
 
     return (
         <div className="space-y-8">
             <header className="space-y-2">
                 <h1 className="text-3xl font-headline font-bold text-primary flex items-center gap-2">
-                    <TrainFront size={32} /> Live Station Train Status
+                    <TrainFront size={32} /> Train Route Search
                 </h1>
                 <p className="text-muted-foreground">
-                    This page fetches live train arrivals and departures from the IRCTC API.
+                    This page fetches the route of a specific train from the Indian Railway API.
                 </p>
             </header>
 
             <Card>
                 <CardHeader>
-                    <CardTitle>Search Trains</CardTitle>
-                    <CardDescription>Enter a station code (e.g., BBS, NDLS, HWH) and the time window in hours.</CardDescription>
+                    <CardTitle>Search Train Route</CardTitle>
+                    <CardDescription>Enter a valid 5-digit train number.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-4 items-end">
                         <div className="flex-1 w-full">
-                            <Label htmlFor="stationCode">Station Code</Label>
+                            <Label htmlFor="trainNumber">Train Number</Label>
                             <Input
-                                id="stationCode"
-                                value={stationCode}
-                                onChange={(e) => setStationCode(e.target.value.toUpperCase())}
-                                placeholder="e.g. BBS"
+                                id="trainNumber"
+                                value={trainNumber}
+                                onChange={(e) => setTrainNumber(e.target.value)}
+                                placeholder="e.g. 12051"
                                 className="mt-1"
-                            />
-                        </div>
-                        <div className="flex-1 w-full">
-                             <Label htmlFor="hours">Time Window (Hours)</Label>
-                             <Input
-                                id="hours"
-                                type="number"
-                                value={hours}
-                                onChange={(e) => setHours(e.target.value)}
-                                placeholder="e.g. 4"
-                                className="mt-1"
-                                min="1"
-                                max="8"
                             />
                         </div>
                         <Button type="submit" disabled={isLoading} className="w-full sm:w-auto">
@@ -135,60 +131,69 @@ export default function TrainsPage() {
                 </CardContent>
             </Card>
 
-            <Card className="shadow-lg">
-                <CardHeader>
-                    <CardTitle>Trains at {stationCode || 'N/A'}</CardTitle>
-                     <CardDescription>
-                        Displaying trains scheduled within the next {hours} hour(s).
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
-                    {isLoading ? (
-                        <div className="flex justify-center items-center py-8">
-                            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                            <p className="ml-4">Fetching train data...</p>
+            {isLoading && (
+                <div className="flex justify-center items-center py-8">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                    <p className="ml-4">Fetching train details...</p>
+                </div>
+            )}
+            
+            {error && !isLoading && (
+                <div className="flex items-center gap-2 text-destructive p-3 bg-destructive/10 rounded-md">
+                    <AlertTriangle className="h-5 w-5" />
+                    <p className="font-medium">{error}</p>
+                </div>
+            )}
+
+            {trainDetails && !isLoading && (
+                <Card className="shadow-lg">
+                    <CardHeader>
+                        <CardTitle>{trainDetails.train_name} ({trainDetails.train_number})</CardTitle>
+                         <CardDescription className="flex items-center gap-2 font-medium">
+                            <span>{trainDetails.source_station_name}</span> 
+                            <ArrowRight className="h-4 w-4" /> 
+                            <span>{trainDetails.destination_station_name}</span>
+                        </CardDescription>
+                        <div className="flex flex-wrap gap-1 pt-2">
+                            <span className="text-xs font-semibold mr-2">Runs On:</span>
+                            {trainDetails.running_days.map(day => <Badge key={day} variant="secondary">{day}</Badge>)}
                         </div>
-                    ) : error ? (
-                        <div className="flex items-center gap-2 text-destructive p-3 bg-destructive/10 rounded-md">
-                            <AlertTriangle className="h-5 w-5" />
-                            <p className="font-medium">{error}</p>
-                        </div>
-                    ) : (
+                    </CardHeader>
+                    <CardContent>
+                        <h3 className="font-semibold mb-2 text-primary">Route Details</h3>
                         <div className="overflow-x-auto">
                             <Table>
                                 <TableHeader>
                                     <TableRow>
-                                        <TableHead>Train Name</TableHead>
-                                        <TableHead>Train No.</TableHead>
-                                        <TableHead>From</TableHead>
-                                        <TableHead>To</TableHead>
-                                        <TableHead>Arrival (ETA)</TableHead>
-                                        <TableHead>Departure (ETD)</TableHead>
+                                        <TableHead>Station</TableHead>
+                                        <TableHead>Arrival</TableHead>
+                                        <TableHead>Departure</TableHead>
+                                        <TableHead>Day</TableHead>
+                                        <TableHead>Distance (km)</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {trains.length > 0 ? trains.map((train, index) => (
-                                        <TableRow key={`${train.train_no}-${index}`}>
-                                            <TableCell className="font-medium">{train.train_name}</TableCell>
-                                            <TableCell>{train.train_no}</TableCell>
-                                            <TableCell>{train.from_station_name}</TableCell>
-                                            <TableCell>{train.to_station_name}</TableCell>
-                                            <TableCell>{train.eta}</TableCell>
-                                            <TableCell>{train.etd}</TableCell>
+                                    {trainDetails.route.length > 0 ? trainDetails.route.map((stop, index) => (
+                                        <TableRow key={`${stop.station_code}-${index}`}>
+                                            <TableCell className="font-medium">{stop.station_name} ({stop.station_code})</TableCell>
+                                            <TableCell>{stop.arrival_time}</TableCell>
+                                            <TableCell>{stop.departure_time}</TableCell>
+                                            <TableCell>{stop.day_of_journey}</TableCell>
+                                            <TableCell>{stop.distance_from_source_in_km}</TableCell>
                                         </TableRow>
                                     )) : (
                                         <TableRow>
-                                            <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                                                No trains found for the specified criteria.
+                                            <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                                                No route information available for this train.
                                             </TableCell>
                                         </TableRow>
                                     )}
                                 </TableBody>
                             </Table>
                         </div>
-                    )}
-                </CardContent>
-            </Card>
+                    </CardContent>
+                </Card>
+            )}
         </div>
     );
 }
