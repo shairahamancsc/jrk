@@ -53,11 +53,12 @@ export default function TrainsPage() {
         setTrainDetails(null);
 
         try {
-            const response = await fetch(`https://indian-railway-irctc.p.rapidapi.com/api/trains-search/v1/train/${trainNumber}`, {
+            const response = await fetch(`https://indian-railway-irctc.p.rapidapi.com/api/trains-search/v1/train/${trainNumber}?isH5=true&client=web`, {
                 method: 'GET',
                 headers: {
                     'x-rapidapi-key': apiKey,
                     'x-rapidapi-host': 'indian-railway-irctc.p.rapidapi.com',
+                    'x-rapid-api': 'rapid-api-database'
                 }
             });
 
