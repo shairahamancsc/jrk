@@ -11,6 +11,7 @@ import {
   UserPlus, 
   Banknote,
   Wrench,
+  MapPin,
 } from 'lucide-react';
 import {
   SidebarMenu,
@@ -26,6 +27,7 @@ const navItemsBase = [
   { href: '/attendance', label: 'Daily Attendance', icon: CalendarCheck },
   { href: '/payment-reports', label: 'Payment Reports', icon: Banknote },
   { href: '/tools', label: 'Tools', icon: Wrench },
+  { href: '/locations', label: 'Locations', icon: MapPin },
 ];
 
 const adminNavItems = [

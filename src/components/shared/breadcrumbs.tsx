@@ -17,6 +17,7 @@ const Breadcrumbs = () => {
     if (segment.toLowerCase() === 'pdf-edit') return 'PDF Editor';
     if (segment.toLowerCase() === 'pdf-merge') return 'PDF Merger';
     if (segment.toLowerCase() === 'pdf-split') return 'PDF Splitter';
+    if (segment.toLowerCase() === 'locations') return 'Locations';
 
     // General case: replace hyphens and capitalize words
     return segment
