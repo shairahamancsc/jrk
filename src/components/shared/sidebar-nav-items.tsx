@@ -1,4 +1,3 @@
-
 "use client";
 
 import Link from 'next/link';
@@ -12,6 +11,7 @@ import {
   Banknote,
   Wrench,
   MapPin,
+  TrainFront,
 } from 'lucide-react';
 import {
   SidebarMenu,
@@ -28,6 +28,7 @@ const navItemsBase = [
   { href: '/payment-reports', label: 'Payment Reports', icon: Banknote },
   { href: '/tools', label: 'Tools', icon: Wrench },
   { href: '/locations', label: 'Locations', icon: MapPin },
+  { href: '/trains', label: 'Trains', icon: TrainFront },
 ];
 
 const adminNavItems = [
