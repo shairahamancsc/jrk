@@ -16,8 +16,6 @@ const Breadcrumbs = () => {
     if (segment.toLowerCase() === 'pdf-edit') return 'PDF Editor';
     if (segment.toLowerCase() === 'pdf-merge') return 'PDF Merger';
     if (segment.toLowerCase() === 'pdf-split') return 'PDF Splitter';
-    if (segment.toLowerCase() === 'locations') return 'Locations';
-    if (segment.toLowerCase() === 'trains') return 'Trains';
 
     // General case: replace hyphens and capitalize words
     return segment
@@ -63,11 +61,4 @@ const Breadcrumbs = () => {
                 {formatSegment(segment)}
               </Link>
             )}
-          </React.Fragment>
-        );
-      })}
-    </nav>
-  );
-};
-
-export default Breadcrumbs;
+          </React.Fragment

@@ -10,8 +10,6 @@ import {
   UserPlus, 
   Banknote,
   Wrench,
-  MapPin,
-  TrainFront,
 } from 'lucide-react';
 import {
   SidebarMenu,
@@ -27,8 +25,6 @@ const navItemsBase = [
   { href: '/attendance', label: 'Daily Attendance', icon: CalendarCheck },
   { href: '/payment-reports', label: 'Payment Reports', icon: Banknote },
   { href: '/tools', label: 'Tools', icon: Wrench },
-  { href: '/locations', label: 'Locations', icon: MapPin },
-  { href: '/trains', label: 'Trains', icon: TrainFront },
 ];
 
 const adminNavItems = [
@@ -69,9 +65,4 @@ export function SidebarNavItems() {
             onClick={logout}
           >
             <LogOut className="size-4 shrink-0" />
-            <span className="group-data-[collapsible=icon]:hidden">Logout</span>
-          </Button>
-      </div>
-    </>
-  );
-}
+            <span className="group-data-[collapsible=icon]:
