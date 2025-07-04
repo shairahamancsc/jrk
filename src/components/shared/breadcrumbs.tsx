@@ -61,4 +61,11 @@ const Breadcrumbs = () => {
                 {formatSegment(segment)}
               </Link>
             )}
-          </React.Fragment
+          </React.Fragment>
+        );
+      })}
+    </nav>
+  );
+};
+
+export default Breadcrumbs;
