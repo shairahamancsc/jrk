@@ -65,4 +65,9 @@ export function SidebarNavItems() {
             onClick={logout}
           >
             <LogOut className="size-4 shrink-0" />
-            <span className="group-data-[collapsible=icon]:
+            <span className="group-data-[collapsible=icon]:hidden">Log Out</span>
+          </Button>
+      </div>
+    </>
+  );
+}
