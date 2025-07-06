@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from 'next/link';
@@ -10,6 +11,7 @@ import {
   UserPlus, 
   Banknote,
   Wrench,
+  FileSignature,
 } from 'lucide-react';
 import {
   SidebarMenu,
@@ -24,6 +26,7 @@ const navItemsBase = [
   { href: '/labor', label: 'Labor Profiles', icon: Users },
   { href: '/attendance', label: 'Daily Attendance', icon: CalendarCheck },
   { href: '/payment-reports', label: 'Payment Reports', icon: Banknote },
+  { href: '/certificate', label: 'Certificate', icon: FileSignature },
   { href: '/tools', label: 'Tools', icon: Wrench },
 ];
 
