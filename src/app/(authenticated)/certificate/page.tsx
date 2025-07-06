@@ -49,16 +49,18 @@ export default function CertificatePage() {
       });
 
       if (!response.ok) {
+        // Read the response body as text ONCE.
+        const errorText = await response.text();
         let errorMessage = 'Failed to generate certificate.';
         try {
-          const errorData = await response.json();
+          // Try to parse the text as JSON.
+          const errorData = JSON.parse(errorText);
           errorMessage = errorData.message || errorMessage;
         } catch (e) {
-          // The response was not JSON. It might be a server error page (HTML) or plain text.
-          const textError = await response.text();
-          // We don't want to display a whole HTML page in the toast, so we give a generic message.
+          // If parsing fails, it's not JSON.
+          // Log the raw text for debugging, but show a generic user message.
+          console.error("Server returned non-JSON error response:", errorText);
           errorMessage = 'An unexpected server error occurred. Please check the function logs.';
-          console.error("Server returned non-JSON error response:", textError);
         }
         throw new Error(errorMessage);
       }
