@@ -26,6 +26,24 @@ export async function POST(req: NextRequest) {
         get(name: string) {
           return cookieStore.get(name)?.value
         },
+        set(name: string, value: string, options: CookieOptions) {
+          try {
+            cookieStore.set({ name, value, ...options })
+          } catch (error) {
+            // The `set` method was called from a Server Component.
+            // This can be ignored if you have middleware refreshing
+            // user sessions.
+          }
+        },
+        remove(name: string, options: CookieOptions) {
+          try {
+            cookieStore.set({ name, value: '', ...options })
+          } catch (error) {
+            // The `delete` method was called from a Server Component.
+            // This can be ignored if you have middleware refreshing
+            // user sessions.
+          }
+        },
       },
     }
   );
@@ -33,14 +51,14 @@ export async function POST(req: NextRequest) {
   try {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
-      return new NextResponse(JSON.stringify({ message: 'Unauthorized' }), { status: 401 });
+      return new NextResponse(JSON.stringify({ message: 'Unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
     }
 
     const body: CertificateFormData = await req.json();
     const validation = certificateSchema.safeParse(body);
 
     if (!validation.success) {
-      return new NextResponse(JSON.stringify({ message: 'Invalid input.', errors: validation.error.flatten().fieldErrors }), { status: 400 });
+      return new NextResponse(JSON.stringify({ message: 'Invalid input.', errors: validation.error.flatten().fieldErrors }), { status: 400, headers: { 'Content-Type': 'application/json' } });
     }
 
     const formData = validation.data;
@@ -128,6 +146,6 @@ export async function POST(req: NextRequest) {
 
   } catch (error: any) {
     console.error('Certificate API Error:', error);
-    return new NextResponse(JSON.stringify({ message: error.message || 'An internal server error occurred.' }), { status: 500 });
+    return new NextResponse(JSON.stringify({ message: error.message || 'An internal server error occurred.' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
   }
 }
