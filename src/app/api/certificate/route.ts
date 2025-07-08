@@ -8,6 +8,11 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { certificateSchema, type CertificateFormData } from '@/schemas/certificate-schema';
 
+// Check for the service role key at module start.
+if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  console.error("CRITICAL: SUPABASE_SERVICE_ROLE_KEY is not set. PDF storage will fail.");
+}
+
 // Service role client for backend operations like storage uploads
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -15,43 +20,23 @@ const supabaseAdmin = createClient(
 );
 
 export async function POST(req: NextRequest) {
-  const cookieStore = cookies();
-  
-  // Using createServerClient for more robust server-side handling
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name: string) {
-          return cookieStore.get(name)?.value
-        },
-        set(name: string, value: string, options: CookieOptions) {
-          try {
-            cookieStore.set({ name, value, ...options })
-          } catch (error) {
-            // The `set` method was called from a Server Component.
-            // This can be ignored if you have middleware refreshing
-            // user sessions.
-          }
-        },
-        remove(name: string, options: CookieOptions) {
-          try {
-            cookieStore.set({ name, value: '', ...options })
-          } catch (error) {
-            // The `delete` method was called from a Server Component.
-            // This can be ignored if you have middleware refreshing
-            // user sessions.
-          }
-        },
-      },
-    }
-  );
-
   try {
+    const cookieStore = cookies();
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          get(name: string) { return cookieStore.get(name)?.value },
+          set(name: string, value: string, options: CookieOptions) { try { cookieStore.set({ name, value, ...options }) } catch (error) {} },
+          remove(name: string, options: CookieOptions) { try { cookieStore.set({ name, value: '', ...options }) } catch (error) {} },
+        },
+      }
+    );
+    
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
-      return new NextResponse(JSON.stringify({ message: 'Unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
+      return new NextResponse(JSON.stringify({ message: 'Unauthorized: User session not found.' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
     }
 
     const body: CertificateFormData = await req.json();
@@ -60,20 +45,22 @@ export async function POST(req: NextRequest) {
     if (!validation.success) {
       return new NextResponse(JSON.stringify({ message: 'Invalid input.', errors: validation.error.flatten().fieldErrors }), { status: 400, headers: { 'Content-Type': 'application/json' } });
     }
-
     const formData = validation.data;
 
-    // Load the existing PDF template
-    const pdfPath = path.join(process.cwd(), 'public', 'Completion.pdf');
-    const existingPdfBytes = await fs.readFile(pdfPath);
+    let existingPdfBytes;
+    try {
+        const pdfPath = path.join(process.cwd(), 'public', 'Completion.pdf');
+        existingPdfBytes = await fs.readFile(pdfPath);
+    } catch (fsError) {
+        console.error('Error reading PDF template:', fsError);
+        throw new Error('PDF template file "public/Completion.pdf" not found on the server. Please ensure it has been uploaded.');
+    }
+    
     const pdfDoc = await PDFDocument.load(existingPdfBytes);
     const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
     const firstPage = pdfDoc.getPages()[0];
     const { width, height } = firstPage.getSize();
     
-    // Define coordinates and draw text (adjust these based on your PDF template)
-    // These coordinates are estimations and will likely need fine-tuning.
-    // Origin (0,0) is the bottom-left corner of the page.
     const black = rgb(0, 0, 0);
     const fontSize = 10;
 
@@ -82,7 +69,6 @@ export async function POST(req: NextRequest) {
     firstPage.drawText(`${formData.state}, ${formData.district} - ${formData.areaPin}`, { x: 150, y: height - 200, font, size: fontSize, color: black });
     firstPage.drawText(`${formData.mainSwitchAmps} Amps`, { x: 270, y: height - 332, font, size: fontSize, color: black });
 
-    // Loop through equipment and draw them
     let yPosition = height - 392;
     formData.equipments.forEach((equip, index) => {
         if (yPosition < 0) return; // Stop if we run out of space
@@ -90,17 +76,18 @@ export async function POST(req: NextRequest) {
         firstPage.drawText(equip.name, { x: 120, y: yPosition, font, size: fontSize, color: black });
         firstPage.drawText(equip.capacity.toString(), { x: 310, y: yPosition, font, size: fontSize, color: black });
         firstPage.drawText(equip.quantity.toString(), { x: 425, y: yPosition, font, size: fontSize, color: black });
-        yPosition -= 18; // Decrement Y for the next line
+        yPosition -= 18;
     });
 
-    // Save the modified PDF to a buffer
     const pdfBytes = await pdfDoc.save();
 
-    // --- Supabase Integration ---
-    const certificateId = crypto.randomUUID();
-    const filePath = `certificates/${certificateId}.pdf`;
+    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+        throw new Error('Server configuration error: SUPABASE_SERVICE_ROLE_KEY is not set. Cannot upload to storage.');
+    }
 
-    // 1. Upload to Supabase Storage
+    const certificateId = crypto.randomUUID();
+    const filePath = `certificates/${user.id}/${certificateId}.pdf`;
+
     const { error: storageError } = await supabaseAdmin.storage
       .from('certificates')
       .upload(filePath, pdfBytes, {
@@ -110,32 +97,28 @@ export async function POST(req: NextRequest) {
 
     if (storageError) {
       console.error('Supabase Storage Error:', storageError);
-      throw new Error('Failed to save certificate to storage.');
+      throw new Error(`Failed to save certificate to storage. Please check bucket policies and configuration. Details: ${storageError.message}`);
     }
 
-    // 2. Get public URL
     const { data: { publicUrl } } = supabaseAdmin.storage
       .from('certificates')
       .getPublicUrl(filePath);
 
-    // 3. Insert record into Supabase database
     const { error: dbError } = await supabase
       .from('certificates')
       .insert({
         id: certificateId,
         user_id: user.id,
-        payload: body as any, // Store the original request body
+        payload: formData as any,
         pdf_url: publicUrl,
       });
       
     if (dbError) {
       console.error('Supabase DB Error:', dbError);
-      // Attempt to clean up storage if DB insert fails
       await supabaseAdmin.storage.from('certificates').remove([filePath]);
-      throw new Error('Failed to record certificate in database.');
+      throw new Error(`Failed to record certificate in database. Please check table permissions and schema. Details: ${dbError.message}`);
     }
     
-    // Return the generated PDF to the client for download
     return new NextResponse(pdfBytes, {
       status: 200,
       headers: {
