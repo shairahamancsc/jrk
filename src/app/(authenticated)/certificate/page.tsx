@@ -27,8 +27,8 @@ export default function CertificatePage() {
       state: '',
       district: '',
       areaPin: '',
-      mainSwitchAmps: '',
-      equipments: [{ name: '', capacity: '', quantity: '' }],
+      mainSwitchAmps: undefined,
+      equipments: [{ name: '', capacity: undefined, quantity: undefined }],
     },
   });
 
@@ -187,7 +187,7 @@ export default function CertificatePage() {
                     <FormItem>
                       <FormLabel>Area PIN Code</FormLabel>
                       <FormControl>
-                        <Input placeholder="Enter PIN code" {...field} type="number" />
+                        <Input placeholder="Enter PIN code" {...field} type="text" inputMode="numeric" maxLength={6} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -211,7 +211,13 @@ export default function CertificatePage() {
                       <FormItem>
                         <FormLabel>Main Switch Capacity (Amps)</FormLabel>
                         <FormControl>
-                          <Input placeholder="e.g., 63" {...field} type="number" />
+                          <Input 
+                            type="number" 
+                            placeholder="e.g., 63" 
+                             {...field}
+                             onChange={e => field.onChange(e.target.valueAsNumber || undefined)}
+                             value={field.value ?? ''}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -256,7 +262,13 @@ export default function CertificatePage() {
                             render={({ field }) => (
                               <FormItem>
                                 <FormControl>
-                                  <Input type="number" placeholder="e.g., 100" {...field} />
+                                  <Input 
+                                    type="number" 
+                                    placeholder="e.g., 100" 
+                                    {...field} 
+                                    onChange={e => field.onChange(e.target.valueAsNumber || undefined)}
+                                    value={field.value ?? ''}
+                                  />
                                 </FormControl>
                                 <FormMessage />
                               </FormItem>
@@ -270,7 +282,13 @@ export default function CertificatePage() {
                             render={({ field }) => (
                               <FormItem>
                                 <FormControl>
-                                  <Input type="number" placeholder="e.g., 5" {...field} />
+                                  <Input 
+                                    type="number" 
+                                    placeholder="e.g., 5" 
+                                    {...field} 
+                                    onChange={e => field.onChange(e.target.valueAsNumber || undefined)}
+                                    value={field.value ?? ''}
+                                  />
                                 </FormControl>
                                 <FormMessage />
                               </FormItem>
@@ -300,7 +318,7 @@ export default function CertificatePage() {
                 variant="outline"
                 size="sm"
                 className="mt-4"
-                onClick={() => append({ name: '', capacity: '', quantity: '' })}
+                onClick={() => append({ name: '', capacity: undefined, quantity: undefined })}
               >
                 <PlusCircle className="mr-2 h-4 w-4" />
                 Add Equipment
