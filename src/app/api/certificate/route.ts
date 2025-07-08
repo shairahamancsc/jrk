@@ -69,7 +69,8 @@ export async function POST(req: NextRequest) {
     formData.equipments.forEach((equip, index) => {
         if (yPosition < 0) return; // Stop if we run out of space
         firstPage.drawText(`${index + 1}.`, { x: 75, y: yPosition, font, size: fontSize, color: black });
-        firstPage.drawText(equip.capacity.toString(), { x: 210, y: yPosition, font, size: fontSize, color: black });
+        firstPage.drawText(equip.name, { x: 120, y: yPosition, font, size: fontSize, color: black });
+        firstPage.drawText(equip.capacity.toString(), { x: 310, y: yPosition, font, size: fontSize, color: black });
         firstPage.drawText(equip.quantity.toString(), { x: 425, y: yPosition, font, size: fontSize, color: black });
         yPosition -= 18; // Decrement Y for the next line
     });

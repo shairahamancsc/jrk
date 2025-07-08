@@ -2,6 +2,7 @@
 import { z } from 'zod';
 
 const equipmentSchema = z.object({
+  name: z.string().min(2, { message: "Name must be at least 2 characters" }),
   capacity: z.string().min(1, "Capacity is required").pipe(z.coerce.number().positive("Capacity must be a positive number")),
   quantity: z.string().min(1, "Quantity is required").pipe(z.coerce.number().int().positive("Quantity must be a positive integer")),
 });

@@ -28,7 +28,7 @@ export default function CertificatePage() {
       district: '',
       areaPin: '',
       mainSwitchAmps: '',
-      equipments: [{ capacity: '', quantity: '' }],
+      equipments: [{ name: '', capacity: '', quantity: '' }],
     },
   });
 
@@ -226,6 +226,7 @@ export default function CertificatePage() {
                  <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead>Equipment Name</TableHead>
                       <TableHead>Capacity (Watts)</TableHead>
                       <TableHead>No. of Points</TableHead>
                       <TableHead className="w-[50px]"></TableHead>
@@ -234,6 +235,20 @@ export default function CertificatePage() {
                   <TableBody>
                     {fields.map((field, index) => (
                        <TableRow key={field.id}>
+                        <TableCell>
+                          <FormField
+                            control={form.control}
+                            name={`equipments.${index}.name`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormControl>
+                                  <Input placeholder="e.g., Fan" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </TableCell>
                         <TableCell>
                           <FormField
                             control={form.control}
@@ -285,7 +300,7 @@ export default function CertificatePage() {
                 variant="outline"
                 size="sm"
                 className="mt-4"
-                onClick={() => append({ capacity: '', quantity: '' })}
+                onClick={() => append({ name: '', capacity: '', quantity: '' })}
               >
                 <PlusCircle className="mr-2 h-4 w-4" />
                 Add Equipment
