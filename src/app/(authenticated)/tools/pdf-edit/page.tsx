@@ -145,7 +145,11 @@ export default function PdfEditPage() {
     
     try {
       const arrayBuffer = await selectedFile.arrayBuffer();
-      const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+      const loadingTask = pdfjsLib.getDocument({ 
+        data: arrayBuffer,
+        cMapUrl: `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/cmaps/`,
+        cMapPacked: true,
+      });
       const pdf = await loadingTask.promise;
       
       const newPageInfos: PageInfo[] = [];
@@ -447,5 +451,3 @@ export default function PdfEditPage() {
     </div>
   );
 }
-
-    

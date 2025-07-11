@@ -74,7 +74,11 @@ export default function PdfCompressPage() {
 
     try {
       const arrayBuffer = await file.arrayBuffer();
-      const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer, cMapUrl: `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/cmaps/`, cMapPacked: true });
+      const loadingTask = pdfjsLib.getDocument({ 
+          data: arrayBuffer, 
+          cMapUrl: `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/cmaps/`, 
+          cMapPacked: true 
+      });
       const pdf = await loadingTask.promise;
       
       const newPdfDoc = await PDFDocument.create();

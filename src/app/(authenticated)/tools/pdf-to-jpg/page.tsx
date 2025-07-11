@@ -49,7 +49,11 @@ export default function PdfToJpgPage() {
 
     try {
       const arrayBuffer = await selectedFile.arrayBuffer();
-      const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+      const loadingTask = pdfjsLib.getDocument({ 
+          data: arrayBuffer,
+          cMapUrl: `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/cmaps/`,
+          cMapPacked: true,
+      });
       const pdf = await loadingTask.promise;
       setPageCount(pdf.numPages);
       toast({ title: 'PDF Loaded', description: `Your PDF has ${pdf.numPages} pages and is ready to be converted.` });
@@ -71,7 +75,11 @@ export default function PdfToJpgPage() {
     const newImageUrls: string[] = [];
     try {
       const arrayBuffer = await file.arrayBuffer();
-      const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+      const loadingTask = pdfjsLib.getDocument({ 
+          data: arrayBuffer,
+          cMapUrl: `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/cmaps/`,
+          cMapPacked: true,
+      });
       const pdf = await loadingTask.promise;
       
       for (let i = 1; i <= pdf.numPages; i++) {
