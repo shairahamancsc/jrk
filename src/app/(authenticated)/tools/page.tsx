@@ -4,7 +4,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
-import { Wrench, FilePenLine, GitMerge, FileImage, Scissors, Images } from 'lucide-react';
+import { Wrench, FilePenLine, GitMerge, FileImage, Scissors, Images, Shrink } from 'lucide-react';
 
 const tools = [
   {
@@ -40,6 +40,13 @@ const tools = [
     description: 'Convert multiple JPG images into a single, organized PDF document.',
     href: '/tools/jpg-to-pdf',
     icon: Images,
+    status: 'Ready',
+  },
+   {
+    title: 'PDF Compressor',
+    description: 'Reduce the file size of your PDF by compressing the images within it.',
+    href: '/tools/pdf-compress',
+    icon: Shrink,
     status: 'Ready',
   },
 ];
