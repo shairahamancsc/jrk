@@ -93,6 +93,7 @@ const LaborProfileFormComponent = ({
 
     try {
       if (mode === 'edit' && existingProfile) {
+        // Correctly pass existingProfile.id to the update function
         await updateLaborProfile(existingProfile.id, profileDataForContext);
       } else {
         await addLaborProfile(profileDataForContext); 
@@ -344,5 +345,3 @@ const LaborProfileFormComponent = ({
 }
 
 export const LaborProfileForm = React.memo(LaborProfileFormComponent);
-
-    
