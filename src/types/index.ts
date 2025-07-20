@@ -53,6 +53,20 @@ export interface PaymentHistoryEntry {
   created_at: string;
 }
 
+export interface CustomerProfile {
+  id: string;
+  user_id?: string;
+  customer_id: string;
+  name: string;
+  mobile_no: string;
+  address: string;
+  category: string;
+  ownership_type: string;
+  load_in_tons: number;
+  payment_rate_per_load?: number;
+  created_at: string;
+}
+
 
 export type Json =
   | string
@@ -245,6 +259,55 @@ export type Database = {
             foreignKeyName: "payment_history_labor_id_fkey"
             columns: ["labor_id"]
             referencedRelation: "labor_profiles"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      customer_profiles: {
+        Row: {
+          id: string
+          user_id: string
+          customer_id: string
+          name: string
+          mobile_no: string
+          address: string
+          category: string
+          ownership_type: string
+          load_in_tons: number
+          payment_rate_per_load: number | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          customer_id: string
+          name: string
+          mobile_no: string
+          address: string
+          category: string
+          ownership_type: string
+          load_in_tons: number
+          payment_rate_per_load?: number | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          customer_id?: string
+          name?: string
+          mobile_no?: string
+          address?: string
+          category?: string
+          ownership_type?: string
+          load_in_tons?: number
+          payment_rate_per_load?: number | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_profiles_user_id_fkey"
+            columns: ["user_id"]
+            referencedRelation: "users"
             referencedColumns: ["id"]
           }
         ]
