@@ -271,16 +271,13 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     }
     setIsLoading(true);
   
-    // Correctly get the existing profile from the LOCAL state.
     const existingProfile = laborProfiles.find(p => p.id === profileId);
-
     if (!existingProfile) {
-      toast({ variant: "destructive", title: "Update Error", description: "Original profile not found in local data." });
+      toast({ variant: "destructive", title: "Update Error", description: "Original profile not found. Cannot proceed." });
       setIsLoading(false);
       return;
     }
   
-    // Build the update payload directly from the form data
     const updatePayload: Partial<LaborProfile> = {
       name: profileData.name,
       contact: profileData.contact,
@@ -289,7 +286,6 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       daily_salary: profileData.dailySalary || null,
     };
   
-    // File handling: Check for new files, upload them, and update the payload
     if (profileData.photo instanceof File) {
       await deleteFile(existingProfile.photo_url);
       updatePayload.photo_url = await uploadFile(profileData.photo, profileData.name || existingProfile.name);
@@ -484,5 +480,7 @@ export const useData = () => {
   }
   return context;
 };
+
+    
 
     
