@@ -4,15 +4,17 @@
 import type { ReactNode } from 'react';
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase/client';
-import type { LaborProfile, AttendanceEntry, LaborProfileFormDataWithFiles, Database, PaymentHistoryEntry } from '@/types';
+import type { LaborProfile, AttendanceEntry, LaborProfileFormDataWithFiles, Database, PaymentHistoryEntry, CustomerProfile } from '@/types';
 import { useAuth } from './auth-context'; 
 import { useToast } from "@/hooks/use-toast";
 import { formatISO } from 'date-fns';
+import { CustomerProfileFormData } from '@/schemas/customer-schema';
 
 interface DataContextType {
   laborProfiles: LaborProfile[];
   attendanceEntries: AttendanceEntry[];
   paymentHistory: PaymentHistoryEntry[];
+  customerProfiles: CustomerProfile[];
   addLaborProfile: (profileData: LaborProfileFormDataWithFiles) => Promise<void>;
   updateLaborProfile: (profileId: string, profileData: Partial<LaborProfileFormDataWithFiles>) => Promise<void>; 
   deleteLaborProfile: (profileId: string) => Promise<void>;
@@ -20,6 +22,9 @@ interface DataContextType {
   addAttendanceEntry: (entryData: Omit<AttendanceEntry, 'id' | 'created_at' | 'user_id'>) => Promise<void>;
   addPaymentHistoryEntry: (paymentData: Omit<PaymentHistoryEntry, 'id' | 'created_at' | 'user_id'>) => Promise<void>;
   fetchPaymentHistory: () => Promise<void>;
+  addCustomerProfile: (profileData: CustomerProfileFormData) => Promise<void>;
+  updateCustomerProfile: (profileId: string, profileData: Partial<CustomerProfileFormData>) => Promise<void>;
+  deleteCustomerProfile: (profileId: string) => Promise<void>;
   isLoading: boolean;
 }
 
@@ -48,6 +53,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   const [laborProfiles, setLaborProfiles] = useState<LaborProfile[]>([]);
   const [attendanceEntries, setAttendanceEntries] = useState<AttendanceEntry[]>([]);
   const [paymentHistory, setPaymentHistory] = useState<PaymentHistoryEntry[]>([]);
+  const [customerProfiles, setCustomerProfiles] = useState<CustomerProfile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { user } = useAuth();
   const { toast } = useToast();
@@ -71,6 +77,27 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       setLaborProfiles(data || []);
     }
   };
+
+  const fetchCustomerProfiles = async () => {
+    if (!user?.id) {
+      setCustomerProfiles([]);
+      return;
+    }
+    const { data, error } = await supabase
+      .from('customer_profiles')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('[DataProvider] Error fetching customer profiles:', error);
+      toast({ variant: "destructive", title: "Fetch Error", description: "Could not fetch customer profiles." });
+      setCustomerProfiles([]);
+    } else {
+      setCustomerProfiles(data || []);
+    }
+  };
+
 
   const fetchLaborProfileById = async (profileId: string): Promise<LaborProfile | null> => {
     if (!user?.id) {
@@ -141,12 +168,14 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         await Promise.all([
           fetchLaborProfiles(),
           fetchAttendanceEntries(),
-          fetchPaymentHistory()
+          fetchPaymentHistory(),
+          fetchCustomerProfiles()
         ]);
       } else {
         setLaborProfiles([]);
         setAttendanceEntries([]);
         setPaymentHistory([]);
+        setCustomerProfiles([]);
       }
       setIsLoading(false);
     };
@@ -263,6 +292,80 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     }
     setIsLoading(false);
   };
+  
+  const updateLaborProfile = async (profileId: string, profileData: Partial<LaborProfileFormDataWithFiles>) => {
+    if (!user?.id) {
+        toast({ variant: "destructive", title: "Auth Error", description: "User not authenticated." });
+        return;
+    }
+    setIsLoading(true);
+
+    const existingProfile = await fetchLaborProfileById(profileId);
+    if (!existingProfile) {
+        toast({ variant: "destructive", title: "Update Error", description: "Original profile not found." });
+        setIsLoading(false);
+        return;
+    }
+    
+    const finalUpdateObject: Partial<Database['public']['Tables']['labor_profiles']['Update']> = {
+      name: profileData.name,
+      contact: profileData.contact,
+      aadhaar_number: profileData.aadhaarNumber || null,
+      pan_number: profileData.panNumber?.toUpperCase() || null,
+      daily_salary: profileData.dailySalary || null,
+    };
+
+    let filesWereUpdated = false;
+    if (profileData.photo instanceof File) {
+      await deleteFile(existingProfile.photo_url);
+      finalUpdateObject.photo_url = await uploadFile(profileData.photo, profileData.name || existingProfile.name);
+      filesWereUpdated = true;
+    }
+    if (profileData.aadhaar instanceof File) {
+      await deleteFile(existingProfile.aadhaar_url);
+      finalUpdateObject.aadhaar_url = await uploadFile(profileData.aadhaar, profileData.name || existingProfile.name);
+      filesWereUpdated = true;
+    }
+    if (profileData.pan instanceof File) {
+      await deleteFile(existingProfile.pan_url);
+      finalUpdateObject.pan_url = await uploadFile(profileData.pan, profileData.name || existingProfile.name);
+      filesWereUpdated = true;
+    }
+    if (profileData.drivingLicense instanceof File) {
+      await deleteFile(existingProfile.driving_license_url);
+      finalUpdateObject.driving_license_url = await uploadFile(profileData.drivingLicense, profileData.name || existingProfile.name);
+      filesWereUpdated = true;
+    }
+
+    const hasTextChanged = 
+      finalUpdateObject.name !== existingProfile.name ||
+      finalUpdateObject.contact !== existingProfile.contact ||
+      (finalUpdateObject.aadhaar_number ?? null) !== (existingProfile.aadhaar_number ?? null) ||
+      (finalUpdateObject.pan_number ?? null) !== (existingProfile.pan_number ?? null) ||
+      (finalUpdateObject.daily_salary ?? null) !== (existingProfile.daily_salary ?? null);
+
+    if (!hasTextChanged && !filesWereUpdated) {
+      toast({ title: "No Changes", description: "No new information or files were provided to update."});
+      setIsLoading(false);
+      return;
+    }
+    
+    const { error: updateError } = await supabase
+      .from('labor_profiles')
+      .update(finalUpdateObject)
+      .eq('id', profileId)
+      .eq('user_id', user.id);
+
+    if (updateError) {
+      console.error('[DataProvider] Error updating labor profile:', updateError);
+      toast({ variant: "destructive", title: "Update Failed", description: `Could not update profile: ${updateError.message}` });
+    } else {
+      await fetchLaborProfiles(); 
+      toast({ title: "Success", description: `Profile for ${profileData.name || existingProfile.name} updated.` });
+    }
+    setIsLoading(false);
+  };
+
 
   const deleteLaborProfile = async (profileId: string) => {
     if (!user?.id) {
@@ -329,95 +432,6 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     }
   };
   
-  const updateLaborProfile = async (profileId: string, profileData: Partial<LaborProfileFormDataWithFiles>) => {
-    if (!user?.id) {
-        toast({ variant: "destructive", title: "Auth Error", description: "User not authenticated." });
-        return;
-    }
-    setIsLoading(true);
-
-    const existingProfile = await fetchLaborProfileById(profileId);
-    if (!existingProfile) {
-        toast({ variant: "destructive", title: "Update Error", description: "Original profile not found." });
-        setIsLoading(false);
-        return;
-    }
-    
-    const finalUpdateObject: Partial<Database['public']['Tables']['labor_profiles']['Update']> = {};
-
-    if (profileData.name !== undefined && profileData.name !== existingProfile.name) {
-      finalUpdateObject.name = profileData.name;
-    }
-    if (profileData.contact !== undefined && profileData.contact !== existingProfile.contact) {
-      finalUpdateObject.contact = profileData.contact;
-    }
-    if (profileData.aadhaarNumber !== undefined) { 
-      if (profileData.aadhaarNumber !== existingProfile.aadhaar_number) {
-        finalUpdateObject.aadhaar_number = profileData.aadhaarNumber;
-      }
-    } else if (profileData.hasOwnProperty('aadhaarNumber') && existingProfile.aadhaar_number !== null) { 
-        finalUpdateObject.aadhaar_number = null; 
-    }
-    if (profileData.panNumber !== undefined) {
-      const upperPan = profileData.panNumber.toUpperCase();
-      if (upperPan !== existingProfile.pan_number) {
-        finalUpdateObject.pan_number = upperPan;
-      }
-    } else if (profileData.hasOwnProperty('panNumber') && existingProfile.pan_number !== null) {
-        finalUpdateObject.pan_number = null;
-    }
-    if (profileData.dailySalary !== undefined) {
-      if (profileData.dailySalary !== existingProfile.daily_salary) {
-        finalUpdateObject.daily_salary = profileData.dailySalary;
-      }
-    } else if (profileData.hasOwnProperty('dailySalary') && existingProfile.daily_salary !== null) { 
-        finalUpdateObject.daily_salary = null;
-    }
-
-    let filesWereUpdated = false;
-    if (profileData.photo instanceof File) {
-      await deleteFile(existingProfile.photo_url);
-      finalUpdateObject.photo_url = await uploadFile(profileData.photo, profileData.name || existingProfile.name);
-      filesWereUpdated = true;
-    }
-    if (profileData.aadhaar instanceof File) {
-      await deleteFile(existingProfile.aadhaar_url);
-      finalUpdateObject.aadhaar_url = await uploadFile(profileData.aadhaar, profileData.name || existingProfile.name);
-      filesWereUpdated = true;
-    }
-    if (profileData.pan instanceof File) {
-      await deleteFile(existingProfile.pan_url);
-      finalUpdateObject.pan_url = await uploadFile(profileData.pan, profileData.name || existingProfile.name);
-      filesWereUpdated = true;
-    }
-    if (profileData.drivingLicense instanceof File) {
-      await deleteFile(existingProfile.driving_license_url);
-      finalUpdateObject.driving_license_url = await uploadFile(profileData.drivingLicense, profileData.name || existingProfile.name);
-      filesWereUpdated = true;
-    }
-    
-    if (Object.keys(finalUpdateObject).length === 0 && !filesWereUpdated) {
-      toast({ title: "No Changes", description: "No new information or files were provided to update."});
-      setIsLoading(false);
-      return;
-    }
-
-    const { error: updateError } = await supabase
-      .from('labor_profiles')
-      .update(finalUpdateObject)
-      .eq('id', profileId)
-      .eq('user_id', user.id);
-
-    if (updateError) {
-      console.error('[DataProvider] Error updating labor profile:', updateError);
-      toast({ variant: "destructive", title: "Update Failed", description: `Could not update profile: ${updateError.message}` });
-    } else {
-      await fetchLaborProfiles(); 
-      toast({ title: "Success", description: `Profile for ${profileData.name || existingProfile.name} updated.` });
-    }
-    setIsLoading(false);
-  };
-
   const addAttendanceEntry = async (entryData: Omit<AttendanceEntry, 'id' | 'created_at' | 'user_id'>) => {
      if (!user?.id) {
       toast({ variant: "destructive", title: "Auth Error", description: "User not authenticated to add attendance." });
@@ -487,12 +501,100 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     setIsLoading(false);
   };
 
+  const addCustomerProfile = async (profileData: CustomerProfileFormData) => {
+    if (!user?.id) {
+      toast({ variant: "destructive", title: "Auth Error", description: "User not authenticated to add customer." });
+      return;
+    }
+    setIsLoading(true);
+
+    const profileToInsert: Omit<Database['public']['Tables']['customer_profiles']['Insert'], 'id' | 'created_at'> = {
+      user_id: user.id,
+      ...profileData
+    };
+    
+    const { data, error } = await supabase
+      .from('customer_profiles')
+      .insert(profileToInsert)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('[DataProvider] Error adding customer profile:', error);
+      toast({ variant: "destructive", title: "Database Error", description: `Could not add customer profile: ${error.message}` });
+    } else if (data) {
+      await fetchCustomerProfiles(); 
+      toast({ title: "Success", description: "Customer profile added." });
+    }
+    setIsLoading(false);
+  };
+
+  const updateCustomerProfile = async (profileId: string, profileData: Partial<CustomerProfileFormData>) => {
+    if (!user?.id) {
+      toast({ variant: "destructive", title: "Auth Error", description: "User not authenticated." });
+      return;
+    }
+    setIsLoading(true);
+
+    const { error } = await supabase
+      .from('customer_profiles')
+      .update(profileData)
+      .eq('id', profileId)
+      .eq('user_id', user.id);
+
+    if (error) {
+      console.error('[DataProvider] Error updating customer profile:', error);
+      toast({ variant: "destructive", title: "Update Failed", description: `Could not update profile: ${error.message}` });
+    } else {
+      await fetchCustomerProfiles();
+      toast({ title: "Success", description: `Profile for ${profileData.name} updated.` });
+    }
+    setIsLoading(false);
+  };
+
+  const deleteCustomerProfile = async (profileId: string) => {
+    if (!user?.id) {
+      toast({ variant: "destructive", title: "Auth Error", description: "User not authenticated." });
+      throw new Error("User not authenticated");
+    }
+
+    const profileToDelete = customerProfiles.find(p => p.id === profileId);
+    if (!profileToDelete) {
+      toast({ variant: "destructive", title: "Error", description: "Customer profile not found." });
+      throw new Error("Profile not found");
+    }
+
+    setIsLoading(true);
+    try {
+      const { error: dbError } = await supabase
+        .from('customer_profiles')
+        .delete()
+        .eq('id', profileId)
+        .eq('user_id', user.id);
+
+      if (dbError) {
+        console.error('[DataProvider] Error deleting customer profile:', dbError);
+        toast({ variant: "destructive", title: "Database Error", description: `Could not delete profile: ${dbError.message}` });
+        throw dbError;
+      }
+
+      setCustomerProfiles(prev => prev.filter(p => p.id !== profileId));
+      toast({ title: "Success", description: `Profile for ${profileToDelete.name} deleted.` });
+
+    } catch (error) {
+      console.error('[DataProvider] Overall error in deleteCustomerProfile:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
 
   return (
     <DataContext.Provider value={{ 
         laborProfiles, 
         attendanceEntries, 
         paymentHistory,
+        customerProfiles,
         addLaborProfile, 
         updateLaborProfile,
         deleteLaborProfile,
@@ -500,6 +602,9 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         addAttendanceEntry, 
         addPaymentHistoryEntry,
         fetchPaymentHistory,
+        addCustomerProfile,
+        updateCustomerProfile,
+        deleteCustomerProfile,
         isLoading 
     }}>
       {children}
@@ -514,3 +619,5 @@ export const useData = () => {
   }
   return context;
 };
+
+    
