@@ -278,60 +278,36 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
   
-    // Start with a clean slate for the update payload
-    const finalUpdateObject: Partial<Database['public']['Tables']['labor_profiles']['Update']> = {};
+    // Build the update payload directly from the form data
+    const updatePayload: Partial<LaborProfile> = {
+      name: profileData.name,
+      contact: profileData.contact,
+      aadhaar_number: profileData.aadhaarNumber || null,
+      pan_number: profileData.panNumber ? profileData.panNumber.toUpperCase() : null,
+      daily_salary: profileData.dailySalary || null,
+    };
   
-    // Check and add only the fields that have actually changed
-    if (profileData.name !== undefined && profileData.name !== existingProfile.name) {
-      finalUpdateObject.name = profileData.name;
-    }
-    if (profileData.contact !== undefined && profileData.contact !== existingProfile.contact) {
-      finalUpdateObject.contact = profileData.contact;
-    }
-    if (profileData.aadhaarNumber !== undefined && profileData.aadhaarNumber !== (existingProfile.aadhaar_number || '')) {
-      finalUpdateObject.aadhaar_number = profileData.aadhaarNumber || null;
-    }
-    if (profileData.panNumber !== undefined && profileData.panNumber.toUpperCase() !== (existingProfile.pan_number || '')) {
-      finalUpdateObject.pan_number = profileData.panNumber.toUpperCase() || null;
-    }
-    if (profileData.dailySalary !== undefined && profileData.dailySalary !== (existingProfile.daily_salary || undefined)) {
-      finalUpdateObject.daily_salary = profileData.dailySalary || null;
-    }
-  
-    // File handling
-    let filesWereUpdated = false;
+    // File handling: Check for new files, upload them, and update the payload
     if (profileData.photo instanceof File) {
       await deleteFile(existingProfile.photo_url);
-      finalUpdateObject.photo_url = await uploadFile(profileData.photo, profileData.name || existingProfile.name);
-      filesWereUpdated = true;
+      updatePayload.photo_url = await uploadFile(profileData.photo, profileData.name || existingProfile.name);
     }
     if (profileData.aadhaar instanceof File) {
       await deleteFile(existingProfile.aadhaar_url);
-      finalUpdateObject.aadhaar_url = await uploadFile(profileData.aadhaar, profileData.name || existingProfile.name);
-      filesWereUpdated = true;
+      updatePayload.aadhaar_url = await uploadFile(profileData.aadhaar, profileData.name || existingProfile.name);
     }
     if (profileData.pan instanceof File) {
       await deleteFile(existingProfile.pan_url);
-      finalUpdateObject.pan_url = await uploadFile(profileData.pan, profileData.name || existingProfile.name);
-      filesWereUpdated = true;
+      updatePayload.pan_url = await uploadFile(profileData.pan, profileData.name || existingProfile.name);
     }
     if (profileData.drivingLicense instanceof File) {
       await deleteFile(existingProfile.driving_license_url);
-      finalUpdateObject.driving_license_url = await uploadFile(profileData.drivingLicense, profileData.name || existingProfile.name);
-      filesWereUpdated = true;
-    }
-  
-    const hasTextChanged = Object.keys(finalUpdateObject).length > 0;
-  
-    if (!hasTextChanged && !filesWereUpdated) {
-      toast({ title: "No Changes", description: "No new information or files were provided to update."});
-      setIsLoading(false);
-      return;
+      updatePayload.driving_license_url = await uploadFile(profileData.drivingLicense, profileData.name || existingProfile.name);
     }
   
     const { error: updateError } = await supabase
       .from('labor_profiles')
-      .update(finalUpdateObject)
+      .update(updatePayload)
       .eq('id', profileId)
       .eq('user_id', user.id);
   
@@ -340,7 +316,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       toast({ variant: "destructive", title: "Update Failed", description: `Could not update profile: ${updateError.message}` });
     } else {
       await fetchLaborProfiles(); 
-      toast({ title: "Success", description: `Profile for ${profileData.name || existingProfile.name} updated.` });
+      toast({ title: "Success", description: `Profile for ${updatePayload.name || existingProfile.name} updated.` });
     }
     setIsLoading(false);
   };
