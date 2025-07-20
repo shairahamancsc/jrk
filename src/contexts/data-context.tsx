@@ -271,9 +271,11 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     }
     setIsLoading(true);
   
-    const existingProfile = await fetchLaborProfileById(profileId);
+    // Correctly get the existing profile from the LOCAL state.
+    const existingProfile = laborProfiles.find(p => p.id === profileId);
+
     if (!existingProfile) {
-      toast({ variant: "destructive", title: "Update Error", description: "Original profile not found." });
+      toast({ variant: "destructive", title: "Update Error", description: "Original profile not found in local data." });
       setIsLoading(false);
       return;
     }
@@ -482,3 +484,5 @@ export const useData = () => {
   }
   return context;
 };
+
+    
