@@ -74,7 +74,7 @@ const LaborProfileFormComponent = ({
       });
       setPhotoPreviewUrl(null);
     }
-  }, [existingProfile, mode, form.reset]);
+  }, [existingProfile, mode, form]);
 
 
   const onSubmit = async (data: LaborProfileFormData) => {
@@ -344,3 +344,5 @@ const LaborProfileFormComponent = ({
 }
 
 export const LaborProfileForm = React.memo(LaborProfileFormComponent);
+
+    
