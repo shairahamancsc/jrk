@@ -74,7 +74,7 @@ const LaborProfileFormComponent = ({
       });
       setPhotoPreviewUrl(null);
     }
-  }, [existingProfile?.id, mode, form.reset]);
+  }, [existingProfile, mode, form.reset]);
 
 
   const onSubmit = async (data: LaborProfileFormData) => {
