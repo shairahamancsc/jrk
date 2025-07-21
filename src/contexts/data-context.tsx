@@ -16,7 +16,6 @@ interface DataContextType {
   addLaborProfile: (profileData: LaborProfileFormDataWithFiles) => Promise<void>;
   updateLaborProfile: (profileId: string, profileData: LaborProfileFormDataWithFiles) => Promise<void>; 
   deleteLaborProfile: (profileId: string) => Promise<void>;
-  fetchLaborProfileById: (profileId: string) => Promise<LaborProfile | null>;
   addAttendanceEntry: (entryData: Omit<AttendanceEntry, 'id' | 'created_at' | 'user_id'>) => Promise<void>;
   addPaymentHistoryEntry: (paymentData: Omit<PaymentHistoryEntry, 'id' | 'created_at' | 'user_id'>) => Promise<void>;
   fetchPaymentHistory: () => Promise<void>;
@@ -30,13 +29,11 @@ const STORAGE_BUCKET_NAME = 'profile-documents';
 const getPathFromUrl = (url: string): string | null => {
   try {
     const urlObject = new URL(url);
-    // Path format is /storage/v1/object/public/bucket_name/folder/file.jpg
     const pathSegments = urlObject.pathname.split('/');
     const bucketNameIndex = pathSegments.indexOf(STORAGE_BUCKET_NAME);
     if (bucketNameIndex !== -1 && bucketNameIndex + 1 < pathSegments.length) {
       return pathSegments.slice(bucketNameIndex + 1).join('/');
     }
-    console.warn("[DataProvider] Could not derive storage path from URL:", url);
     return null;
   } catch (e) {
     console.error("[DataProvider] Error parsing URL for file path:", e, "URL:", url);
@@ -71,28 +68,6 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     } else {
       setLaborProfiles(data || []);
     }
-  };
-
-  const fetchLaborProfileById = async (profileId: string): Promise<LaborProfile | null> => {
-    if (!user?.id) {
-        toast({ variant: "destructive", title: "Auth Error", description: "User not authenticated." });
-        return null;
-    }
-    const { data, error } = await supabase
-        .from('labor_profiles')
-        .select('*')
-        .eq('id', profileId)
-        .eq('user_id', user.id)
-        .single();
-    
-    if (error) {
-        console.error(`[DataProvider] Error fetching labor profile by ID ${profileId}:`, error);
-        if (error.code !== 'PGRST116') { 
-             toast({ variant: "destructive", title: "Fetch Error", description: `Could not fetch profile: ${error.message}` });
-        }
-        return null;
-    }
-    return data;
   };
 
   const fetchAttendanceEntries = async () => {
@@ -162,19 +137,16 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     const sanitizedProfileName = profileName.replace(/[^a-zA-Z0-9-_]/g, '_');
     const filePathInBucket = `public/${user.id}/${sanitizedProfileName}_${Date.now()}_${file.name}`;
     
-    const { data, error } = await supabase.storage
+    const { error } = await supabase.storage
       .from(STORAGE_BUCKET_NAME)
-      .upload(filePathInBucket, file, {
-        cacheControl: '3600',
-        upsert: false, 
-      });
+      .upload(filePathInBucket, file);
 
     if (error) {
-      console.error('[DataProvider] Error uploading file. Raw error object:', error);
+      console.error('[DataProvider] Error uploading file:', error);
       toast({ 
         variant: "destructive", 
         title: "Upload Error", 
-        description: `Could not upload ${file.name}. ${error.message || 'Please check storage permissions and browser console for details.'}` 
+        description: `Could not upload ${file.name}. ${error.message}` 
       });
       return undefined;
     }
@@ -197,11 +169,8 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
     if (error) {
       console.error('[DataProvider] Error deleting file from storage:', filePath, error);
-      // We don't toast here because this is part of a larger operation. The caller will handle toast.
-      // toast({ variant: "destructive", title: "Storage Error", description: `Could not delete old file: ${error.message}` });
       return false;
     }
-    console.log("[DataProvider] Successfully deleted old file:", filePath);
     return true;
   };
 
@@ -213,48 +182,24 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     setIsLoading(true);
 
     try {
-      let photo_url: string | undefined = undefined;
-      if (profileFormData.photo instanceof File) {
-        photo_url = await uploadFile(profileFormData.photo, profileFormData.name);
-      }
-
-      let aadhaar_url: string | undefined = undefined;
-      if (profileFormData.aadhaar instanceof File) {
-        aadhaar_url = await uploadFile(profileFormData.aadhaar, profileFormData.name);
-      }
-
-      let pan_url: string | undefined = undefined;
-      if (profileFormData.pan instanceof File) {
-        pan_url = await uploadFile(profileFormData.pan, profileFormData.name);
-      }
-
-      let driving_license_url: string | undefined = undefined;
-      if (profileFormData.drivingLicense instanceof File) {
-        driving_license_url = await uploadFile(profileFormData.drivingLicense, profileFormData.name);
-      }
-
-      const profileToInsert: Omit<Database['public']['Tables']['labor_profiles']['Insert'], 'id' | 'created_at'> = {
+      const profileToInsert: Database['public']['Tables']['labor_profiles']['Insert'] = {
         user_id: user.id,
         name: profileFormData.name,
         contact: profileFormData.contact,
         aadhaar_number: profileFormData.aadhaarNumber,
         pan_number: profileFormData.panNumber ? profileFormData.panNumber.toUpperCase() : undefined,
-        daily_salary: profileFormData.dailySalary, 
-        photo_url,
-        aadhaar_url,
-        pan_url,
-        driving_license_url,
+        daily_salary: profileFormData.dailySalary,
+        photo_url: profileFormData.photo instanceof File ? await uploadFile(profileFormData.photo, profileFormData.name) : undefined,
+        aadhaar_url: profileFormData.aadhaar instanceof File ? await uploadFile(profileFormData.aadhaar, profileFormData.name) : undefined,
+        pan_url: profileFormData.pan instanceof File ? await uploadFile(profileFormData.pan, profileFormData.name) : undefined,
+        driving_license_url: profileFormData.drivingLicense instanceof File ? await uploadFile(profileFormData.drivingLicense, profileFormData.name) : undefined,
       };
       
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('labor_profiles')
-        .insert(profileToInsert)
-        .select()
-        .single();
+        .insert(profileToInsert);
 
-      if (error) {
-        throw new Error(error.message);
-      }
+      if (error) throw new Error(error.message);
       
       await fetchLaborProfiles(); 
       toast({ title: "Success", description: "Labor profile added." });
@@ -275,11 +220,9 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
     try {
         const existingProfile = laborProfiles.find(p => p.id === profileId);
-        if (!existingProfile) {
-            throw new Error("Original profile not found in local state. Cannot proceed.");
-        }
+        if (!existingProfile) throw new Error("Original profile not found. Cannot proceed.");
 
-        const updatePayload: Partial<LaborProfile> = {
+        const updatePayload: Database['public']['Tables']['labor_profiles']['Update'] = {
             name: profileData.name,
             contact: profileData.contact,
             aadhaar_number: profileData.aadhaarNumber || null,
@@ -287,22 +230,21 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
             daily_salary: profileData.dailySalary || null,
         };
 
-        // Handle file updates: delete old and upload new if a new file is provided.
         if (profileData.photo instanceof File) {
             await deleteFile(existingProfile.photo_url);
-            updatePayload.photo_url = await uploadFile(profileData.photo, profileData.name || existingProfile.name);
+            updatePayload.photo_url = await uploadFile(profileData.photo, profileData.name);
         }
         if (profileData.aadhaar instanceof File) {
             await deleteFile(existingProfile.aadhaar_url);
-            updatePayload.aadhaar_url = await uploadFile(profileData.aadhaar, profileData.name || existingProfile.name);
+            updatePayload.aadhaar_url = await uploadFile(profileData.aadhaar, profileData.name);
         }
         if (profileData.pan instanceof File) {
             await deleteFile(existingProfile.pan_url);
-            updatePayload.pan_url = await uploadFile(profileData.pan, profileData.name || existingProfile.name);
+            updatePayload.pan_url = await uploadFile(profileData.pan, profileData.name);
         }
         if (profileData.drivingLicense instanceof File) {
             await deleteFile(existingProfile.driving_license_url);
-            updatePayload.driving_license_url = await uploadFile(profileData.drivingLicense, profileData.name || existingProfile.name);
+            updatePayload.driving_license_url = await uploadFile(profileData.drivingLicense, profileData.name);
         }
 
         const { error: updateError } = await supabase
@@ -311,16 +253,15 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
             .eq('id', profileId)
             .eq('user_id', user.id);
 
-        if (updateError) {
-           throw new Error(updateError.message);
-        }
+        if (updateError) throw new Error(updateError.message);
         
         await fetchLaborProfiles();
-        toast({ title: "Success", description: `Profile for ${updatePayload.name || existingProfile.name} updated.` });
+        toast({ title: "Success", description: `Profile for ${updatePayload.name} updated.` });
         
     } catch (error: any) {
         console.error("An error occurred during the update process:", error);
         toast({ variant: "destructive", title: "Update Error", description: error.message || "An unexpected error occurred." });
+        throw error; // Re-throw to be caught in the form component if needed
     } finally {
         setIsLoading(false);
     }
@@ -341,23 +282,13 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
     setIsLoading(true);
     try {
-        const filesToDelete: string[] = [];
-        if (profileToDelete.photo_url) {
-            const path = getPathFromUrl(profileToDelete.photo_url);
-            if (path) filesToDelete.push(path);
-        }
-        if (profileToDelete.aadhaar_url) {
-            const path = getPathFromUrl(profileToDelete.aadhaar_url);
-            if (path) filesToDelete.push(path);
-        }
-        if (profileToDelete.pan_url) {
-            const path = getPathFromUrl(profileToDelete.pan_url);
-            if (path) filesToDelete.push(path);
-        }
-        if (profileToDelete.driving_license_url) {
-            const path = getPathFromUrl(profileToDelete.driving_license_url);
-            if (path) filesToDelete.push(path);
-        }
+        const filesToDelete: string[] = [
+            profileToDelete.photo_url,
+            profileToDelete.aadhaar_url,
+            profileToDelete.pan_url,
+            profileToDelete.driving_license_url,
+        ].filter((url): url is string => !!url).map(getPathFromUrl).filter((path): path is string => !!path);
+
 
         if (filesToDelete.length > 0) {
             const { error: storageError } = await supabase.storage
@@ -365,8 +296,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
                 .remove(filesToDelete);
             if (storageError) {
                 console.error('[DataProvider] Error deleting files from storage:', storageError);
-                toast({ variant: "destructive", title: "Storage Error", description: `Could not delete associated files: ${storageError.message}. Profile not deleted.` });
-                throw storageError; 
+                toast({ variant: "destructive", title: "Storage Error", description: `Could not delete associated files, but proceeding to delete profile record. Please clean storage manually.` });
             }
         }
 
@@ -376,17 +306,14 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
             .eq('id', profileId)
             .eq('user_id', user.id); 
 
-        if (dbError) {
-            console.error('[DataProvider] Error deleting labor profile from database:', dbError);
-            toast({ variant: "destructive", title: "Database Error", description: `Could not delete profile: ${dbError.message}` });
-            throw dbError;
-        }
+        if (dbError) throw dbError;
 
         setLaborProfiles(prevProfiles => prevProfiles.filter(p => p.id !== profileId));
         toast({ title: "Success", description: `Profile for ${profileToDelete.name} deleted.` });
 
-    } catch (error) {
+    } catch (error: any) {
         console.error('[DataProvider] Overall error in deleteLaborProfile:', error);
+        toast({ variant: "destructive", title: "Delete Error", description: `Could not delete profile: ${error.message}` });
     } finally {
         setIsLoading(false);
     }
@@ -411,16 +338,14 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       advance_amount: entryData.advance_amount,
     };
 
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('attendance_entries')
-      .insert(entryToInsert)
-      .select()
-      .single();
+      .insert(entryToInsert);
 
     if (error) {
       console.error('[DataProvider] Error adding attendance entry:', error);
       toast({ variant: "destructive", title: "Database Error", description: `Could not add attendance entry: ${error.message}` });
-    } else if (data) {
+    } else {
       await fetchAttendanceEntries(); 
       toast({ title: "Success", description: "Attendance entry recorded." });
     }
@@ -445,16 +370,14 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       notes: paymentData.notes,
     };
 
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('payment_history')
-      .insert(entryToInsert)
-      .select()
-      .single();
+      .insert(entryToInsert);
 
     if (error) {
       console.error('[DataProvider] Error adding payment history entry:', error);
       toast({ variant: "destructive", title: "Database Error", description: `Could not record payment: ${error.message}` });
-    } else if (data) {
+    } else {
       await fetchPaymentHistory();
       toast({ title: "Success", description: "Payment recorded successfully." });
     }
@@ -469,7 +392,6 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         addLaborProfile, 
         updateLaborProfile,
         deleteLaborProfile,
-        fetchLaborProfileById,
         addAttendanceEntry, 
         addPaymentHistoryEntry,
         fetchPaymentHistory,

@@ -21,9 +21,9 @@ import {
 import {
   Dialog,
   DialogContent,
-  DialogTitle, 
-  DialogDescription, 
   DialogHeader,
+  DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import {
   DropdownMenu,
@@ -33,62 +33,26 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { FileText, UserCircle2, Users, Loader2, MoreHorizontal, Eye, Edit3, Trash2 } from 'lucide-react';
+import { FileText, UserCircle2, Users, Loader2, MoreHorizontal, Edit3, Trash2 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import type { LaborProfile } from '@/types';
-import { useToast } from "@/hooks/use-toast";
 
 export default function LaborPage() {
   const { laborProfiles, isLoading: dataLoading, deleteLaborProfile } = useData();
-  const { toast } = useToast();
   const [clientLoading, setClientLoading] = useState(true);
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
-
-  const [selectedProfile, setSelectedProfile] = useState<LaborProfile | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  const [selectedProfile, setSelectedProfile] = useState<LaborProfile | null>(null);
 
   useEffect(() => {
     if (!dataLoading) {
       setClientLoading(false);
     }
   }, [dataLoading]);
-
-  const getFileDisplay = (fileUrl?: string) => {
-    if (!fileUrl) return <span className="text-muted-foreground text-xs">Not Provided</span>;
-    
-    if (fileUrl.startsWith('https://placehold.co') || fileUrl.startsWith('http')) {
-      const fileName = fileUrl.substring(fileUrl.lastIndexOf('/') + 1).split('?')[0];
-      return (
-        <a 
-          href={fileUrl} 
-          target="_blank" 
-          rel="noopener noreferrer"
-          className="text-accent hover:underline flex items-center gap-1 text-xs"
-          data-ai-hint="document icon"
-        >
-          <FileText size={14} /> {decodeURIComponent(fileName.substring(fileName.indexOf('_', fileName.indexOf('_') + 1) + 1))}
-        </a>
-      );
-    }
-    return <span className="text-xs flex items-center gap-1"><FileText size={14} /> {fileUrl}</span>;
-  };
-
-  const getAvatarSrc = (photoUrl?: string): string => {
-    if (!photoUrl) return '';
-    if (photoUrl.startsWith('http') || photoUrl.startsWith('data:image')) { 
-      return photoUrl;
-    }
-    return ''; 
-  }
-
-  const formatCurrency = (amount?: number) => {
-    if (amount === undefined || amount === null) return <span className="text-muted-foreground text-xs">N/A</span>;
-    return `₹${amount.toFixed(2)}`;
-  };
-
+  
   const handleOpenEditModal = (profile: LaborProfile) => {
     setSelectedProfile(profile);
     setIsEditModalOpen(true);
@@ -99,23 +63,54 @@ export default function LaborPage() {
     setIsDeleteAlertOpen(true);
   };
 
+  const handleCloseDialogs = () => {
+    setSelectedProfile(null);
+    setIsEditModalOpen(false);
+    setIsDeleteAlertOpen(false);
+  };
+
   const handleConfirmDelete = async () => {
     if (!selectedProfile) return;
     setIsDeleting(true);
     try {
       await deleteLaborProfile(selectedProfile.id);
-      setIsDeleteAlertOpen(false);
-      setSelectedProfile(null);
-    } catch (error: any) {
-      console.error("Error during profile deletion in page:", error);
+      handleCloseDialogs();
+    } catch (error) {
+      console.error("Deletion failed in page:", error);
     } finally {
       setIsDeleting(false);
     }
   };
+
+  const getFileDisplay = (fileUrl?: string) => {
+    if (!fileUrl) return <span className="text-muted-foreground text-xs">Not Provided</span>;
+    try {
+      const url = new URL(fileUrl);
+      const fileName = decodeURIComponent(url.pathname.split('/').pop() || '');
+      // Attempt to extract a more user-friendly name, e.g., after the timestamp
+      const friendlyName = fileName.substring(fileName.indexOf('_', fileName.indexOf('_') + 1) + 1);
+      return (
+        <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline flex items-center gap-1 text-xs break-all">
+          <FileText size={14} /> {friendlyName || 'View File'}
+        </a>
+      );
+    } catch (e) {
+      return <span>Invalid URL</span>;
+    }
+  };
+
+  const getAvatarSrc = (photoUrl?: string): string => {
+    return photoUrl || '';
+  };
+
+  const formatCurrency = (amount?: number) => {
+    if (amount === undefined || amount === null) return <span className="text-muted-foreground text-xs">N/A</span>;
+    return `₹${amount.toFixed(2)}`;
+  };
   
   if (clientLoading || dataLoading) { 
     return (
-      <div className="flex h-[calc(100vh-theme(spacing.14)-2*theme(spacing.4))] items-center justify-center">
+      <div className="flex h-screen items-center justify-center">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
       </div>
     );
@@ -142,44 +137,38 @@ export default function LaborPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="px-2 py-3 md:px-4">Photo</TableHead>
-                    <TableHead className="px-2 py-3 md:px-4">Name</TableHead>
-                    <TableHead className="px-2 py-3 md:px-4">Contact</TableHead>
-                    <TableHead className="whitespace-nowrap px-2 py-3 md:px-4">Daily Salary</TableHead>
-                    <TableHead className="whitespace-nowrap px-2 py-3 md:px-4">Aadhaar No.</TableHead>
-                    <TableHead className="whitespace-nowrap px-2 py-3 md:px-4">PAN No.</TableHead>
-                    <TableHead className="px-2 py-3 md:px-4">Aadhaar Doc</TableHead>
-                    <TableHead className="px-2 py-3 md:px-4">PAN Doc</TableHead>
-                    <TableHead className="px-2 py-3 md:px-4">License Doc</TableHead>
-                    <TableHead className="px-2 py-3 md:px-4">Added On</TableHead>
-                    <TableHead className="px-2 py-3 md:px-4">Actions</TableHead>
+                    <TableHead>Photo</TableHead>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Contact</TableHead>
+                    <TableHead>Daily Salary</TableHead>
+                    <TableHead>Aadhaar No.</TableHead>
+                    <TableHead>PAN No.</TableHead>
+                    <TableHead>Aadhaar Doc</TableHead>
+                    <TableHead>PAN Doc</TableHead>
+                    <TableHead>License Doc</TableHead>
+                    <TableHead>Added On</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {laborProfiles.map((profile) => (
                     <TableRow key={profile.id} className="hover:bg-muted/50 transition-colors">
-                      <TableCell className="px-2 py-3 md:px-4">
+                      <TableCell>
                         <Avatar className="h-10 w-10">
-                          <AvatarImage 
-                            src={getAvatarSrc(profile.photo_url)}
-                            alt={profile.name} 
-                            data-ai-hint="profile person"
-                          />
-                          <AvatarFallback>
-                            <UserCircle2 className="text-muted-foreground" />
-                          </AvatarFallback>
+                          <AvatarImage src={getAvatarSrc(profile.photo_url)} alt={profile.name} data-ai-hint="profile person" />
+                          <AvatarFallback><UserCircle2 className="text-muted-foreground" /></AvatarFallback>
                         </Avatar>
                       </TableCell>
-                      <TableCell className="font-medium px-2 py-3 md:px-4 text-xs sm:text-sm">{profile.name}</TableCell>
-                      <TableCell className="px-2 py-3 md:px-4 text-xs sm:text-sm">{profile.contact}</TableCell>
-                      <TableCell className="px-2 py-3 md:px-4 text-xs sm:text-sm">{formatCurrency(profile.daily_salary)}</TableCell>
-                      <TableCell className="px-2 py-3 md:px-4 text-xs sm:text-sm">{profile.aadhaar_number || <span className="text-muted-foreground text-xs">N/A</span>}</TableCell>
-                      <TableCell className="px-2 py-3 md:px-4 text-xs sm:text-sm">{profile.pan_number || <span className="text-muted-foreground text-xs">N/A</span>}</TableCell>
-                      <TableCell className="px-2 py-3 md:px-4 text-xs sm:text-sm">{getFileDisplay(profile.aadhaar_url)}</TableCell>
-                      <TableCell className="px-2 py-3 md:px-4 text-xs sm:text-sm">{getFileDisplay(profile.pan_url)}</TableCell>
-                      <TableCell className="px-2 py-3 md:px-4 text-xs sm:text-sm">{getFileDisplay(profile.driving_license_url)}</TableCell>
-                      <TableCell className="px-2 py-3 md:px-4 text-xs sm:text-sm">{profile.created_at ? format(parseISO(profile.created_at), "PP") : 'N/A'}</TableCell>
-                      <TableCell className="px-2 py-3 md:px-4">
+                      <TableCell className="font-medium text-xs sm:text-sm">{profile.name}</TableCell>
+                      <TableCell className="text-xs sm:text-sm">{profile.contact}</TableCell>
+                      <TableCell className="text-xs sm:text-sm">{formatCurrency(profile.daily_salary)}</TableCell>
+                      <TableCell className="text-xs sm:text-sm">{profile.aadhaar_number || <span className="text-muted-foreground text-xs">N/A</span>}</TableCell>
+                      <TableCell className="text-xs sm:text-sm">{profile.pan_number || <span className="text-muted-foreground text-xs">N/A</span>}</TableCell>
+                      <TableCell className="text-xs sm:text-sm">{getFileDisplay(profile.aadhaar_url)}</TableCell>
+                      <TableCell className="text-xs sm:text-sm">{getFileDisplay(profile.pan_url)}</TableCell>
+                      <TableCell className="text-xs sm:text-sm">{getFileDisplay(profile.driving_license_url)}</TableCell>
+                      <TableCell className="text-xs sm:text-sm">{profile.created_at ? format(parseISO(profile.created_at), "PP") : 'N/A'}</TableCell>
+                      <TableCell className="text-right">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" className="h-8 w-8 p-0">
@@ -214,63 +203,50 @@ export default function LaborPage() {
       </Card>
 
       {/* Edit Modal */}
-      {selectedProfile && (
-        <Dialog open={isEditModalOpen} onOpenChange={(isOpen) => {
-          setIsEditModalOpen(isOpen);
-          if (!isOpen) {
-            setSelectedProfile(null);
-          }
-        }}>
-          <DialogContent key={selectedProfile.id} className="w-[95vw] max-w-2xl rounded-lg">
-             <DialogHeader>
-                <DialogTitle>Edit Profile: {selectedProfile.name}</DialogTitle>
-                 <DialogDescription>
-                  Modify the details for {selectedProfile.name}. Click Save when you're done.
-                </DialogDescription>
-            </DialogHeader>
-            <div className="py-4 max-h-[70vh] overflow-y-auto">
+      <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Edit Profile: {selectedProfile?.name}</DialogTitle>
+            <DialogDescription>
+              Modify the details for {selectedProfile?.name}. Click Save when you're done.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 max-h-[70vh] overflow-y-auto">
+            {selectedProfile && (
               <LaborProfileForm 
                 mode="edit"
                 existingProfile={selectedProfile} 
-                onSubmitSuccess={() => {
-                  setIsEditModalOpen(false);
-                  setSelectedProfile(null);
-                }}
-                onCancel={() => {
-                  setIsEditModalOpen(false);
-                  setSelectedProfile(null);
-                }}
+                onSubmitSuccess={handleCloseDialogs}
+                onCancel={handleCloseDialogs}
               />
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Delete Alert */}
-      {selectedProfile && (
-        <AlertDialog open={isDeleteAlertOpen} onOpenChange={setIsDeleteAlertOpen}>
-          <AlertDialogContent className="w-[90vw] max-w-xs sm:max-w-md rounded-lg">
-            <AlertDialogHeader>
-              <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-              <AlertDialogDescription>
-                This action cannot be undone. This will permanently delete the profile
-                for <strong>{selectedProfile.name}</strong> and all associated documents.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel disabled={isDeleting} onClick={() => setSelectedProfile(null)}>Cancel</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={handleConfirmDelete}
-                disabled={isDeleting}
-                className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
-              >
-                {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {isDeleting ? 'Deleting...' : 'Yes, delete profile'}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      )}
+      <AlertDialog open={isDeleteAlertOpen} onOpenChange={setIsDeleteAlertOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the profile
+              for <strong>{selectedProfile?.name}</strong> and all associated documents.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting} onClick={handleCloseDialogs}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              disabled={isDeleting}
+              className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+            >
+              {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {isDeleting ? 'Deleting...' : 'Yes, delete profile'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

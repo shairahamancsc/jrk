@@ -15,15 +15,15 @@ import { UserPlus, FileText, Loader2, Fingerprint, ScanLine, UserCircle2, FilePl
 import type { LaborProfile, LaborProfileFormDataWithFiles } from '@/types'; 
 
 interface LaborProfileFormProps {
-  existingProfile?: LaborProfile;
-  mode?: 'add' | 'edit';
+  existingProfile?: LaborProfile | null;
+  mode: 'add' | 'edit';
   onCancel?: () => void;
   onSubmitSuccess?: () => void; 
 }
 
 const LaborProfileFormComponent = ({ 
   existingProfile, 
-  mode = 'add', 
+  mode, 
   onCancel,
   onSubmitSuccess 
 }: LaborProfileFormProps) => {
@@ -66,7 +66,6 @@ const LaborProfileFormComponent = ({
     }
   }, [existingProfile, mode, form]);
 
-
   const onSubmit = async (data: LaborProfileFormData) => {
     setIsSubmitting(true);
     
@@ -74,7 +73,7 @@ const LaborProfileFormComponent = ({
       name: data.name,
       contact: data.contact,
       aadhaarNumber: data.aadhaarNumber,
-      panNumber: data.panNumber ? data.panNumber.toUpperCase() : undefined,
+      panNumber: data.panNumber,
       dailySalary: data.dailySalary,
       photo: data.photo, 
       aadhaar: data.aadhaar,
@@ -86,16 +85,14 @@ const LaborProfileFormComponent = ({
       if (mode === 'edit' && existingProfile) {
         await updateLaborProfile(existingProfile.id, profileDataForContext);
       } else {
-        await addLaborProfile(profileDataForContext); 
-      }
-      
-      if (mode === 'add') { 
+        await addLaborProfile(profileDataForContext);
         form.reset();
-        setPhotoPreviewUrl(null); 
+        setPhotoPreviewUrl(null);
       }
-      onSubmitSuccess?.(); 
+      onSubmitSuccess?.();
     } catch (error) {
-      console.error("Submission error in form component:", error);
+      // Error is already toasted in the context, but we can log it here
+      console.error("Form submission failed:", error);
     } finally {
       setIsSubmitting(false);
     }
@@ -134,17 +131,17 @@ const LaborProfileFormComponent = ({
 
   const formContent = (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-2 sm:space-y-3 md:space-y-4">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
         
         <FormField
           control={form.control}
           name="photo"
-          render={({ field }) => (
+          render={() => (
             <FormItem className="flex flex-col items-center space-y-2">
-              <Avatar className="h-12 w-12 sm:h-16 md:h-20 border-2 border-muted-foreground/50">
+              <Avatar className="h-20 w-20 border-2 border-muted-foreground/50">
                 <AvatarImage src={photoPreviewUrl || ''} alt="Profile Photo Preview" data-ai-hint="profile person" />
                 <AvatarFallback>
-                  <UserCircle2 className="h-8 w-8 sm:h-10 md:h-12 text-muted-foreground" />
+                  <UserCircle2 className="h-12 w-12 text-muted-foreground" />
                 </AvatarFallback>
               </Avatar>
               <FormControl>
@@ -154,25 +151,23 @@ const LaborProfileFormComponent = ({
                     type="file"
                     accept="image/*"
                     className="hidden"
+                    {...form.register("photo")}
                     onChange={(e) => {
                       const file = e.target.files?.[0];
                       form.setValue('photo', file, { shouldValidate: true }); 
                       if (file) {
                         const reader = new FileReader();
-                        reader.onloadend = () => {
-                          setPhotoPreviewUrl(reader.result as string);
-                        };
+                        reader.onloadend = () => setPhotoPreviewUrl(reader.result as string);
                         reader.readAsDataURL(file);
                       } else {
-                        setPhotoPreviewUrl(existingProfile?.photo_url || null); 
-                        form.setValue('photo', undefined, { shouldValidate: true });
+                        setPhotoPreviewUrl(existingProfile?.photo_url || null);
                       }
                     }}
                     disabled={isSubmitting}
                   />
                   <FormLabel
                     htmlFor="photo-upload"
-                    className="cursor-pointer inline-flex items-center gap-1 text-xs sm:text-sm font-medium text-primary hover:text-primary/80"
+                    className="cursor-pointer inline-flex items-center gap-1 text-sm font-medium text-primary hover:text-primary/80"
                   >
                     <FilePlus2 size={16} />
                     {photoPreviewUrl ? 'Change Photo' : 'Upload Photo'}
@@ -184,17 +179,17 @@ const LaborProfileFormComponent = ({
           )}
         />
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-1 sm:gap-2 md:gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <FormField
             control={form.control}
             name="name"
             render={({ field }) => (
               <FormItem>
-                <FormLabel className="text-foreground text-xs sm:text-sm">Full Name</FormLabel>
+                <FormLabel className="text-foreground">Full Name</FormLabel>
                 <FormControl>
-                  <Input placeholder="Enter full name" {...field} disabled={isSubmitting} className="text-xs sm:text-sm"/>
+                  <Input placeholder="Enter full name" {...field} disabled={isSubmitting} />
                 </FormControl>
-                <FormMessage className="text-xs"/>
+                <FormMessage />
               </FormItem>
             )}
           />
@@ -203,11 +198,11 @@ const LaborProfileFormComponent = ({
             name="contact"
             render={({ field }) => (
               <FormItem>
-                <FormLabel className="text-foreground text-xs sm:text-sm">Contact Number</FormLabel>
+                <FormLabel className="text-foreground">Contact Number</FormLabel>
                 <FormControl>
-                  <Input placeholder="Enter contact number" {...field} disabled={isSubmitting} className="text-xs sm:text-sm"/>
+                  <Input placeholder="Enter contact number" {...field} disabled={isSubmitting} />
                 </FormControl>
-                <FormMessage className="text-xs"/>
+                <FormMessage />
               </FormItem>
             )}
           />
@@ -216,13 +211,13 @@ const LaborProfileFormComponent = ({
             name="aadhaarNumber"
             render={({ field }) => (
               <FormItem>
-                <FormLabel className="flex items-center gap-1 text-foreground text-xs sm:text-sm">
+                <FormLabel className="flex items-center gap-1 text-foreground">
                   <Fingerprint size={14}/> Aadhaar Number (Optional)
                 </FormLabel>
                 <FormControl>
-                  <Input placeholder="Enter 12-digit Aadhaar number" {...field} disabled={isSubmitting} maxLength={12} className="text-xs sm:text-sm"/>
+                  <Input placeholder="Enter 12-digit Aadhaar number" {...field} disabled={isSubmitting} maxLength={12}/>
                 </FormControl>
-                <FormMessage className="text-xs"/>
+                <FormMessage />
               </FormItem>
             )}
           />
@@ -231,20 +226,19 @@ const LaborProfileFormComponent = ({
             name="panNumber"
             render={({ field }) => (
               <FormItem>
-                <FormLabel className="flex items-center gap-1 text-foreground text-xs sm:text-sm">
+                <FormLabel className="flex items-center gap-1 text-foreground">
                  <ScanLine size={14}/> PAN Number (Optional)
                 </FormLabel>
                 <FormControl>
                   <Input 
-                    placeholder="Enter PAN number (e.g., ABCDE1234F)" 
+                    placeholder="Enter PAN number" 
                     {...field} 
                     disabled={isSubmitting} 
                     maxLength={10}
                     onChange={(e) => field.onChange(e.target.value.toUpperCase())}
-                    className="text-xs sm:text-sm"
                   />
                 </FormControl>
-                <FormMessage className="text-xs"/>
+                <FormMessage />
               </FormItem>
             )}
           />
@@ -253,34 +247,28 @@ const LaborProfileFormComponent = ({
             name="dailySalary"
             render={({ field }) => (
               <FormItem>
-                <FormLabel className="flex items-center gap-1 text-foreground text-xs sm:text-sm">
+                <FormLabel className="flex items-center gap-1 text-foreground">
                   <WalletCards size={14} /> Daily Salary (₹) (Optional)
                 </FormLabel>
                 <FormControl>
                   <Input 
                     type="number"
-                    placeholder="Enter daily salary amount" 
+                    placeholder="Enter daily salary" 
                     {...field} 
-                    value={field.value === undefined ? '' : String(field.value)}
-                    onChange={event => {
-                      const value = event.target.value;
-                      field.onChange(value === '' ? undefined : parseFloat(value));
-                    }}
-                    disabled={isSubmitting} 
-                    step="0.01"
-                    min="0"
-                    className="text-xs sm:text-sm"
+                    value={field.value ?? ''}
+                    onChange={e => field.onChange(e.target.valueAsNumber || undefined)}
+                    disabled={isSubmitting}
                   />
                 </FormControl>
-                <FormMessage className="text-xs"/>
+                <FormMessage />
               </FormItem>
             )}
           />
         </div>
 
-        <h3 className="text-base sm:text-lg font-semibold text-primary pt-3 border-t mt-4">Upload Documents (Optional)</h3>
-        <p className="text-xs sm:text-sm text-muted-foreground -mt-3 mb-3">These are for document copies (images/PDFs). The numbers are entered above.</p>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-1 sm:gap-2 md:gap-3">
+        <h3 className="text-lg font-semibold text-primary pt-3 border-t mt-4">Upload Documents (Optional)</h3>
+        <p className="text-sm text-muted-foreground -mt-3 mb-3">These are for document copies (images/PDFs).</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <GenericFileInput fieldName="aadhaar" label="Aadhaar Card Document" currentFileUrl={existingProfile?.aadhaar_url} />
           <GenericFileInput fieldName="pan" label="PAN Card Document" currentFileUrl={existingProfile?.pan_url}/>
           <GenericFileInput fieldName="drivingLicense" label="Driving License Document" currentFileUrl={existingProfile?.driving_license_url} />
@@ -289,7 +277,7 @@ const LaborProfileFormComponent = ({
         <div className="flex flex-col md:flex-row gap-2 pt-3">
           <Button 
             type="submit" 
-            className="bg-primary hover:bg-primary/90 text-sm sm:text-base py-2.5 px-4 sm:py-3 sm:px-6 w-full md:w-auto"
+            className="bg-primary hover:bg-primary/90"
             disabled={isSubmitting}
           >
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -300,7 +288,6 @@ const LaborProfileFormComponent = ({
               type="button" 
               variant="outline"
               onClick={onCancel}
-              className="text-sm sm:text-base py-2.5 px-4 sm:py-3 sm:px-6 w-full md:w-auto"
               disabled={isSubmitting}
             >
               Cancel
@@ -315,7 +302,7 @@ const LaborProfileFormComponent = ({
     return (
        <Card className="shadow-lg w-full">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-xl sm:text-2xl text-primary font-headline">
+          <CardTitle className="flex items-center gap-2 text-2xl text-primary font-headline">
             <UserPlus /> {cardTitleText}
           </CardTitle>
           <CardDescription>{cardDescriptionText}</CardDescription>
