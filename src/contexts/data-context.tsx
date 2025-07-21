@@ -26,16 +26,12 @@ const DataContext = createContext<DataContextType | undefined>(undefined);
 
 const STORAGE_BUCKET_NAME = 'profile-documents'; 
 
-// This helper function correctly parses the full path of a file from a Supabase storage URL.
-// It finds the bucket name in the path and returns everything after it.
 const getPathFromUrl = (url: string): string | null => {
   try {
     const urlObject = new URL(url);
     const pathSegments = urlObject.pathname.split('/');
-    // Example path: /storage/v1/object/public/profile-documents/public/user_id/file.jpg
     const bucketNameIndex = pathSegments.indexOf(STORAGE_BUCKET_NAME);
     if (bucketNameIndex > -1 && bucketNameIndex + 1 < pathSegments.length) {
-      // The actual path inside the bucket
       return pathSegments.slice(bucketNameIndex + 1).join('/');
     }
     console.warn(`[DataProvider] Could not find bucket '${STORAGE_BUCKET_NAME}' in URL path:`, urlObject.pathname);
@@ -165,7 +161,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     const filePath = getPathFromUrl(fileUrl);
     if (!filePath) {
       console.warn("[DataProvider] Could not determine path for deletion from URL:", fileUrl);
-      return false; // Don't treat as an error, just can't delete.
+      return false; 
     }
 
     const { error } = await supabase.storage
@@ -173,7 +169,6 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       .remove([filePath]);
 
     if (error) {
-      // It's better to log this than to show a disruptive toast, as the main operation might still succeed.
       console.error('[DataProvider] Error deleting file from storage:', filePath, error);
       return false;
     }
@@ -219,55 +214,59 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   
   const updateLaborProfile = async (profileId: string, profileData: LaborProfileFormDataWithFiles) => {
     if (!user?.id) {
-        toast({ variant: "destructive", title: "Auth Error", description: "User not authenticated." });
-        return;
+      toast({ variant: "destructive", title: "Auth Error", description: "User not authenticated." });
+      throw new Error("User not authenticated.");
     }
     setIsLoading(true);
 
     try {
-        const existingProfile = laborProfiles.find(p => p.id === profileId);
-        if (!existingProfile) throw new Error("Original profile not found. Cannot proceed.");
+      const existingProfile = laborProfiles.find(p => p.id === profileId);
+      if (!existingProfile) throw new Error("Original profile not found for update.");
 
-        // Start with non-file data
-        const updatePayload: Database['public']['Tables']['labor_profiles']['Update'] = {
-            name: profileData.name,
-            contact: profileData.contact,
-            aadhaar_number: profileData.aadhaarNumber || null,
-            pan_number: profileData.panNumber ? profileData.panNumber.toUpperCase() : null,
-            daily_salary: profileData.dailySalary || null,
-        };
-        
-        // Helper to manage file updates sequentially
-        const handleFileUpdate = async (newFile: File | undefined, oldUrl: string | null | undefined, fieldName: keyof typeof updatePayload) => {
-            if (newFile instanceof File) {
-                if (oldUrl) await deleteFile(oldUrl);
-                // @ts-ignore
-                updatePayload[fieldName] = await uploadFile(newFile, profileData.name);
-            }
-        };
+      const updatePayload: Database['public']['Tables']['labor_profiles']['Update'] = {
+        name: profileData.name,
+        contact: profileData.contact,
+        aadhaar_number: profileData.aadhaarNumber || null,
+        pan_number: profileData.panNumber ? profileData.panNumber.toUpperCase() : null,
+        daily_salary: profileData.dailySalary || null,
+        photo_url: existingProfile.photo_url,
+        aadhaar_url: existingProfile.aadhaar_url,
+        pan_url: existingProfile.pan_url,
+        driving_license_url: existingProfile.driving_license_url,
+      };
 
-        // Process each file update
-        await handleFileUpdate(profileData.photo, existingProfile.photo_url, 'photo_url');
-        await handleFileUpdate(profileData.aadhaar, existingProfile.aadhaar_url, 'aadhaar_url');
-        await handleFileUpdate(profileData.pan, existingProfile.pan_url, 'pan_url');
-        await handleFileUpdate(profileData.drivingLicense, existingProfile.driving_license_url, 'driving_license_url');
+      const handleFileUpdate = async (newFile: File | undefined, oldUrl: string | null | undefined): Promise<string | null | undefined> => {
+        if (newFile instanceof File) {
+          if (oldUrl) {
+            await deleteFile(oldUrl);
+          }
+          return await uploadFile(newFile, profileData.name);
+        }
+        return oldUrl; 
+      };
 
-        // After all files are handled, update the database record
-        const { error: updateError } = await supabase
-            .from('labor_profiles')
-            .update(updatePayload)
-            .eq('id', profileId)
-            .eq('user_id', user.id);
+      updatePayload.photo_url = await handleFileUpdate(profileData.photo, existingProfile.photo_url);
+      updatePayload.aadhaar_url = await handleFileUpdate(profileData.aadhaar, existingProfile.aadhaar_url);
+      updatePayload.pan_url = await handleFileUpdate(profileData.pan, existingProfile.pan_url);
+      updatePayload.driving_license_url = await handleFileUpdate(profileData.drivingLicense, existingProfile.driving_license_url);
 
-        if (updateError) throw new Error(updateError.message);
-        
-        await fetchLaborProfiles();
-        toast({ title: "Success", description: `Profile for ${updatePayload.name} updated.` });
+      const { error: updateError } = await supabase
+        .from('labor_profiles')
+        .update(updatePayload)
+        .eq('id', profileId)
+        .eq('user_id', user.id);
+
+      if (updateError) {
+        throw new Error(`Database update failed: ${updateError.message}`);
+      }
+      
+      await fetchLaborProfiles();
+      toast({ title: "Success", description: `Profile for ${updatePayload.name} updated.` });
         
     } catch (error: any) {
         console.error("An error occurred during the update process:", error);
         toast({ variant: "destructive", title: "Update Error", description: error.message || "An unexpected error occurred." });
-        throw error; // Re-throw to be caught in the form if needed
+        throw error;
     } finally {
         setIsLoading(false);
     }
@@ -275,53 +274,48 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
   const deleteLaborProfile = async (profileId: string) => {
     if (!user?.id) {
-        toast({ variant: "destructive", title: "Auth Error", description: "User not authenticated." });
-        throw new Error("User not authenticated");
+      toast({ variant: "destructive", title: "Auth Error", description: "User not authenticated." });
+      throw new Error("User not authenticated");
     }
 
     const profileToDelete = laborProfiles.find(p => p.id === profileId);
     if (!profileToDelete) {
-        toast({ variant: "destructive", title: "Error", description: "Profile not found." });
-        throw new Error("Profile not found");
+      toast({ variant: "destructive", title: "Error", description: "Profile not found." });
+      throw new Error("Profile not found");
     }
 
     setIsLoading(true);
     try {
-        // Collect all file URLs that are not null/undefined
-        const filesToDelete: (string | null | undefined)[] = [
-            profileToDelete.photo_url,
-            profileToDelete.aadhaar_url,
-            profileToDelete.pan_url,
-            profileToDelete.driving_license_url,
-        ];
+      const filesToDelete: (string | null | undefined)[] = [
+        profileToDelete.photo_url,
+        profileToDelete.aadhaar_url,
+        profileToDelete.pan_url,
+        profileToDelete.driving_license_url,
+      ];
 
-        // Delete files from storage one by one.
-        for (const fileUrl of filesToDelete) {
-          if (fileUrl) {
-            await deleteFile(fileUrl);
-          }
+      for (const fileUrl of filesToDelete) {
+        if (fileUrl) {
+          await deleteFile(fileUrl);
         }
+      }
 
-        // After attempting to delete files, delete the database record
-        const { error: dbError } = await supabase
-            .from('labor_profiles')
-            .delete()
-            .eq('id', profileId)
-            .eq('user_id', user.id); 
+      const { error: dbError } = await supabase
+        .from('labor_profiles')
+        .delete()
+        .eq('id', profileId)
+        .eq('user_id', user.id); 
 
-        if (dbError) throw dbError;
+      if (dbError) throw dbError;
 
-        // Optimistically update UI
-        setLaborProfiles(prevProfiles => prevProfiles.filter(p => p.id !== profileId));
-        toast({ title: "Success", description: `Profile for ${profileToDelete.name} deleted.` });
+      setLaborProfiles(prevProfiles => prevProfiles.filter(p => p.id !== profileId));
+      toast({ title: "Success", description: `Profile for ${profileToDelete.name} deleted.` });
 
     } catch (error: any) {
-        console.error('[DataProvider] Overall error in deleteLaborProfile:', error);
-        toast({ variant: "destructive", title: "Delete Error", description: `Could not delete profile: ${error.message}` });
-        // If deletion fails, refetch to ensure UI is consistent with DB state
-        await fetchLaborProfiles();
+      console.error('[DataProvider] Overall error in deleteLaborProfile:', error);
+      toast({ variant: "destructive", title: "Delete Error", description: `Could not delete profile: ${error.message}` });
+      await fetchLaborProfiles();
     } finally {
-        setIsLoading(false);
+      setIsLoading(false);
     }
   };
   
