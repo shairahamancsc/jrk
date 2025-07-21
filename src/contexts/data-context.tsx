@@ -26,15 +26,19 @@ const DataContext = createContext<DataContextType | undefined>(undefined);
 
 const STORAGE_BUCKET_NAME = 'profile-documents'; 
 
+// This helper function correctly parses the full path of a file from a Supabase storage URL.
+// It finds the bucket name in the path and returns everything after it.
 const getPathFromUrl = (url: string): string | null => {
   try {
     const urlObject = new URL(url);
     const pathSegments = urlObject.pathname.split('/');
+    // Example path: /storage/v1/object/public/profile-documents/public/user_id/file.jpg
     const bucketNameIndex = pathSegments.indexOf(STORAGE_BUCKET_NAME);
-    if (bucketNameIndex !== -1 && bucketNameIndex + 1 < pathSegments.length) {
-      // Return the path *inside* the bucket, e.g., 'public/user_id/...'
+    if (bucketNameIndex > -1 && bucketNameIndex + 1 < pathSegments.length) {
+      // The actual path inside the bucket
       return pathSegments.slice(bucketNameIndex + 1).join('/');
     }
+    console.warn(`[DataProvider] Could not find bucket '${STORAGE_BUCKET_NAME}' in URL path:`, urlObject.pathname);
     return null;
   } catch (e) {
     console.error("[DataProvider] Error parsing URL for file path:", e, "URL:", url);
@@ -161,7 +165,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     const filePath = getPathFromUrl(fileUrl);
     if (!filePath) {
       console.warn("[DataProvider] Could not determine path for deletion from URL:", fileUrl);
-      return false;
+      return false; // Don't treat as an error, just can't delete.
     }
 
     const { error } = await supabase.storage
@@ -169,6 +173,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       .remove([filePath]);
 
     if (error) {
+      // It's better to log this than to show a disruptive toast, as the main operation might still succeed.
       console.error('[DataProvider] Error deleting file from storage:', filePath, error);
       return false;
     }
@@ -223,6 +228,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         const existingProfile = laborProfiles.find(p => p.id === profileId);
         if (!existingProfile) throw new Error("Original profile not found. Cannot proceed.");
 
+        // Start with non-file data
         const updatePayload: Database['public']['Tables']['labor_profiles']['Update'] = {
             name: profileData.name,
             contact: profileData.contact,
@@ -231,24 +237,22 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
             daily_salary: profileData.dailySalary || null,
         };
         
-        // Sequentially and correctly handle file updates
-        if (profileData.photo instanceof File) {
-            if(existingProfile.photo_url) await deleteFile(existingProfile.photo_url);
-            updatePayload.photo_url = await uploadFile(profileData.photo, profileData.name);
-        }
-        if (profileData.aadhaar instanceof File) {
-            if(existingProfile.aadhaar_url) await deleteFile(existingProfile.aadhaar_url);
-            updatePayload.aadhaar_url = await uploadFile(profileData.aadhaar, profileData.name);
-        }
-        if (profileData.pan instanceof File) {
-            if(existingProfile.pan_url) await deleteFile(existingProfile.pan_url);
-            updatePayload.pan_url = await uploadFile(profileData.pan, profileData.name);
-        }
-        if (profileData.drivingLicense instanceof File) {
-            if(existingProfile.driving_license_url) await deleteFile(existingProfile.driving_license_url);
-            updatePayload.driving_license_url = await uploadFile(profileData.drivingLicense, profileData.name);
-        }
+        // Helper to manage file updates sequentially
+        const handleFileUpdate = async (newFile: File | undefined, oldUrl: string | null | undefined, fieldName: keyof typeof updatePayload) => {
+            if (newFile instanceof File) {
+                if (oldUrl) await deleteFile(oldUrl);
+                // @ts-ignore
+                updatePayload[fieldName] = await uploadFile(newFile, profileData.name);
+            }
+        };
 
+        // Process each file update
+        await handleFileUpdate(profileData.photo, existingProfile.photo_url, 'photo_url');
+        await handleFileUpdate(profileData.aadhaar, existingProfile.aadhaar_url, 'aadhaar_url');
+        await handleFileUpdate(profileData.pan, existingProfile.pan_url, 'pan_url');
+        await handleFileUpdate(profileData.drivingLicense, existingProfile.driving_license_url, 'driving_license_url');
+
+        // After all files are handled, update the database record
         const { error: updateError } = await supabase
             .from('labor_profiles')
             .update(updatePayload)
@@ -263,7 +267,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     } catch (error: any) {
         console.error("An error occurred during the update process:", error);
         toast({ variant: "destructive", title: "Update Error", description: error.message || "An unexpected error occurred." });
-        throw error;
+        throw error; // Re-throw to be caught in the form if needed
     } finally {
         setIsLoading(false);
     }
@@ -283,24 +287,22 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
     setIsLoading(true);
     try {
-        const filesToDelete: string[] = [
+        // Collect all file URLs that are not null/undefined
+        const filesToDelete: (string | null | undefined)[] = [
             profileToDelete.photo_url,
             profileToDelete.aadhaar_url,
             profileToDelete.pan_url,
             profileToDelete.driving_license_url,
-        ].filter((url): url is string => !!url).map(getPathFromUrl).filter((path): path is string => !!path);
+        ];
 
-
-        if (filesToDelete.length > 0) {
-            const { error: storageError } = await supabase.storage
-                .from(STORAGE_BUCKET_NAME)
-                .remove(filesToDelete);
-            if (storageError) {
-                console.error('[DataProvider] Error deleting files from storage:', storageError);
-                toast({ variant: "destructive", title: "Storage Error", description: `Could not delete associated files, but proceeding to delete profile record. Please clean storage manually.` });
-            }
+        // Delete files from storage one by one.
+        for (const fileUrl of filesToDelete) {
+          if (fileUrl) {
+            await deleteFile(fileUrl);
+          }
         }
 
+        // After attempting to delete files, delete the database record
         const { error: dbError } = await supabase
             .from('labor_profiles')
             .delete()
@@ -309,12 +311,15 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
         if (dbError) throw dbError;
 
+        // Optimistically update UI
         setLaborProfiles(prevProfiles => prevProfiles.filter(p => p.id !== profileId));
         toast({ title: "Success", description: `Profile for ${profileToDelete.name} deleted.` });
 
     } catch (error: any) {
         console.error('[DataProvider] Overall error in deleteLaborProfile:', error);
         toast({ variant: "destructive", title: "Delete Error", description: `Could not delete profile: ${error.message}` });
+        // If deletion fails, refetch to ensure UI is consistent with DB state
+        await fetchLaborProfiles();
     } finally {
         setIsLoading(false);
     }

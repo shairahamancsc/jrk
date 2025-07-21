@@ -41,13 +41,14 @@ export default function LaborPage() {
   const { laborProfiles, isLoading: dataLoading, deleteLaborProfile } = useData();
   const [clientLoading, setClientLoading] = useState(true);
 
+  // State for managing modals and selected profile
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
-
+  const [isActionPending, setIsActionPending] = useState(false); // Used for both delete and edit submission
   const [selectedProfile, setSelectedProfile] = useState<LaborProfile | null>(null);
 
   useEffect(() => {
+    // This effect ensures we don't show a loader if data is already available from the context.
     if (!dataLoading) {
       setClientLoading(false);
     }
@@ -71,23 +72,32 @@ export default function LaborPage() {
 
   const handleConfirmDelete = async () => {
     if (!selectedProfile) return;
-    setIsDeleting(true);
+    setIsActionPending(true);
     try {
       await deleteLaborProfile(selectedProfile.id);
       handleCloseDialogs();
     } catch (error) {
+      // Error toast is handled in context, so we just log here.
       console.error("Deletion failed in page:", error);
     } finally {
-      setIsDeleting(false);
+      setIsActionPending(false);
     }
   };
+
+  // This will be called by the form on successful submission
+  const onEditSuccess = () => {
+    setIsEditModalOpen(false);
+    setSelectedProfile(null);
+  }
 
   const getFileDisplay = (fileUrl?: string) => {
     if (!fileUrl) return <span className="text-muted-foreground text-xs">Not Provided</span>;
     try {
       const url = new URL(fileUrl);
-      const fileName = decodeURIComponent(url.pathname.split('/').pop() || '');
-      // Attempt to extract a more user-friendly name, e.g., after the timestamp
+      const pathSegments = decodeURIComponent(url.pathname).split('/');
+      // A more robust way to get the filename which might have encoded characters
+      const fileName = pathSegments.pop() || '';
+      // Attempt to extract a more user-friendly name if it follows the pattern 'timestamp_filename'
       const friendlyName = fileName.substring(fileName.indexOf('_', fileName.indexOf('_') + 1) + 1);
       return (
         <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline flex items-center gap-1 text-xs break-all">
@@ -108,6 +118,7 @@ export default function LaborPage() {
     return `₹${amount.toFixed(2)}`;
   };
   
+  // Show a single loader if either the context is loading or the client is hydrating
   if (clientLoading || dataLoading) { 
     return (
       <div className="flex h-screen items-center justify-center">
@@ -120,8 +131,10 @@ export default function LaborPage() {
     <div className="space-y-8">
       <h1 className="text-2xl sm:text-3xl font-headline font-bold text-primary">Manage Labor Profiles</h1>
       
+      {/* ADD form is separate and always visible */}
       <LaborProfileForm mode="add" />
 
+      {/* EXISTING profiles section */}
       <Card className="shadow-lg">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-xl sm:text-2xl text-primary font-headline">
@@ -202,21 +215,22 @@ export default function LaborPage() {
         </CardContent>
       </Card>
 
-      {/* Edit Modal */}
+      {/* EDIT Modal: Only renders when a profile is selected for editing */}
       <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-3xl">
           <DialogHeader>
             <DialogTitle>Edit Profile: {selectedProfile?.name}</DialogTitle>
             <DialogDescription>
               Modify the details for {selectedProfile?.name}. Click Save when you're done.
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4 max-h-[70vh] overflow-y-auto">
+          <div className="py-4 max-h-[70vh] overflow-y-auto px-1">
             {selectedProfile && (
               <LaborProfileForm 
                 mode="edit"
+                key={selectedProfile.id} // Add key to force re-mount on profile change
                 existingProfile={selectedProfile} 
-                onSubmitSuccess={handleCloseDialogs}
+                onSubmitSuccess={onEditSuccess}
                 onCancel={handleCloseDialogs}
               />
             )}
@@ -224,7 +238,7 @@ export default function LaborPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Alert */}
+      {/* DELETE Alert Dialog */}
       <AlertDialog open={isDeleteAlertOpen} onOpenChange={setIsDeleteAlertOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -235,14 +249,14 @@ export default function LaborPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting} onClick={handleCloseDialogs}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={isActionPending} onClick={handleCloseDialogs}>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleConfirmDelete}
-              disabled={isDeleting}
+              disabled={isActionPending}
               className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
             >
-              {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isDeleting ? 'Deleting...' : 'Yes, delete profile'}
+              {isActionPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {isActionPending ? 'Deleting...' : 'Yes, delete profile'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

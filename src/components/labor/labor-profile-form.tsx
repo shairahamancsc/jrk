@@ -21,7 +21,8 @@ interface LaborProfileFormProps {
   onSubmitSuccess?: () => void; 
 }
 
-const LaborProfileFormComponent = ({ 
+// This is a memoized component to prevent unnecessary re-renders.
+export const LaborProfileForm = React.memo(({ 
   existingProfile, 
   mode, 
   onCancel,
@@ -46,6 +47,7 @@ const LaborProfileFormComponent = ({
     },
   });
 
+  // Effect to populate the form when in 'edit' mode or reset for 'add' mode.
   useEffect(() => {
     if (mode === 'edit' && existingProfile) {
       form.reset({
@@ -54,14 +56,23 @@ const LaborProfileFormComponent = ({
         aadhaarNumber: existingProfile.aadhaar_number || '',
         panNumber: existingProfile.pan_number || '',
         dailySalary: existingProfile.daily_salary || undefined,
-        photo: undefined,
-        aadhaar: undefined,
-        pan: undefined,
-        drivingLicense: undefined,
+        // File inputs are intentionally left undefined as they cannot be pre-populated.
+        // We show the existing file info separately.
       });
       setPhotoPreviewUrl(existingProfile.photo_url || null);
     } else {
-       form.reset();
+       // When in 'add' mode, or when the dialog closes, reset everything.
+       form.reset({
+          name: '',
+          contact: '',
+          aadhaarNumber: '',
+          panNumber: '',
+          dailySalary: undefined,
+          photo: undefined,
+          aadhaar: undefined,
+          pan: undefined,
+          drivingLicense: undefined,
+       });
        setPhotoPreviewUrl(null);
     }
   }, [existingProfile, mode, form]);
@@ -69,6 +80,7 @@ const LaborProfileFormComponent = ({
   const onSubmit = async (data: LaborProfileFormData) => {
     setIsSubmitting(true);
     
+    // The data context expects a specific shape with File objects
     const profileDataForContext: LaborProfileFormDataWithFiles = {
       name: data.name,
       contact: data.contact,
@@ -83,20 +95,24 @@ const LaborProfileFormComponent = ({
 
     try {
       if (mode === 'edit' && existingProfile) {
+        // Crucially pass the existingProfile.id for the update
         await updateLaborProfile(existingProfile.id, profileDataForContext);
       } else {
         await addLaborProfile(profileDataForContext);
-        form.reset();
+        form.reset(); // Reset form only after successful 'add'
         setPhotoPreviewUrl(null);
       }
+      // Signal to the parent component that the submission was successful.
       onSubmitSuccess?.();
     } catch (error) {
       console.error("Form submission failed:", error);
+      // The error toast is handled in the data context.
     } finally {
       setIsSubmitting(false);
     }
   };
   
+  // A reusable component for file inputs to keep the form clean.
   const GenericFileInput = ({ fieldName, label, currentFileUrl }: { fieldName: keyof LaborProfileFormData; label: string, currentFileUrl?: string }) => (
     <FormItem>
       <FormLabel className="flex items-center gap-2 text-foreground text-xs sm:text-sm">
@@ -112,7 +128,7 @@ const LaborProfileFormComponent = ({
         <Input 
           type="file" 
           accept="image/*,application/pdf"
-          className="file:text-primary file:font-semibold file:mr-2 file:border-0 file:bg-accent file:text-accent-foreground file:rounded-md file:px-2 file:py-1 hover:file:bg-accent/80 text-xs"
+          className="file:text-primary file:font-semibold file:mr-2 file:border-0 file:bg-accent file:text-accent-foreground file:rounded-md file:px-2 file:py-1 hover:file:bg-accent/80 text-xs h-9"
           {...form.register(fieldName)} 
           disabled={isSubmitting}
         />
@@ -128,6 +144,7 @@ const LaborProfileFormComponent = ({
   const submitButtonText = mode === 'edit' ? "Save Changes" : "Add Labor Profile";
   const submittingButtonText = mode === 'edit' ? "Saving..." : "Adding...";
 
+  // The main form structure
   const formContent = (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -137,10 +154,10 @@ const LaborProfileFormComponent = ({
           name="photo"
           render={() => (
             <FormItem className="flex flex-col items-center space-y-2">
-              <Avatar className="h-20 w-20 border-2 border-muted-foreground/50">
+              <Avatar className="h-24 w-24 border-2 border-muted-foreground/50">
                 <AvatarImage src={photoPreviewUrl || ''} alt="Profile Photo Preview" data-ai-hint="profile person" />
                 <AvatarFallback>
-                  <UserCircle2 className="h-12 w-12 text-muted-foreground" />
+                  <UserCircle2 className="h-16 w-16 text-muted-foreground" />
                 </AvatarFallback>
               </Avatar>
               <FormControl>
@@ -159,6 +176,7 @@ const LaborProfileFormComponent = ({
                         reader.onloadend = () => setPhotoPreviewUrl(reader.result as string);
                         reader.readAsDataURL(file);
                       } else {
+                        // If file is deselected, revert to the original photo
                         setPhotoPreviewUrl(existingProfile?.photo_url || null);
                       }
                     }}
@@ -178,7 +196,7 @@ const LaborProfileFormComponent = ({
           )}
         />
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
             control={form.control}
             name="name"
@@ -245,7 +263,7 @@ const LaborProfileFormComponent = ({
             control={form.control}
             name="dailySalary"
             render={({ field }) => (
-              <FormItem>
+              <FormItem className="md:col-span-2">
                 <FormLabel className="flex items-center gap-1 text-foreground">
                   <WalletCards size={14} /> Daily Salary (₹) (Optional)
                 </FormLabel>
@@ -265,15 +283,15 @@ const LaborProfileFormComponent = ({
           />
         </div>
 
-        <h3 className="text-lg font-semibold text-primary pt-3 border-t mt-4">Upload Documents (Optional)</h3>
+        <h3 className="text-lg font-semibold text-primary pt-4 border-t mt-6">Upload Documents (Optional)</h3>
         <p className="text-sm text-muted-foreground -mt-3 mb-3">These are for document copies (images/PDFs).</p>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <GenericFileInput fieldName="aadhaar" label="Aadhaar Card Document" currentFileUrl={existingProfile?.aadhaar_url} />
           <GenericFileInput fieldName="pan" label="PAN Card Document" currentFileUrl={existingProfile?.pan_url}/>
           <GenericFileInput fieldName="drivingLicense" label="Driving License Document" currentFileUrl={existingProfile?.driving_license_url} />
         </div>
         
-        <div className="flex flex-col md:flex-row gap-2 pt-3">
+        <div className="flex flex-col md:flex-row gap-2 pt-4">
           <Button 
             type="submit" 
             className="bg-primary hover:bg-primary/90"
@@ -297,6 +315,7 @@ const LaborProfileFormComponent = ({
     </Form>
   );
 
+  // If the mode is 'add', wrap the form in a Card for consistent styling on the page.
   if (mode === 'add') {
     return (
        <Card className="shadow-lg w-full">
@@ -311,9 +330,9 @@ const LaborProfileFormComponent = ({
     );
   }
   
+  // If the mode is 'edit', return only the form content to be placed inside a Dialog.
   return formContent;
-}
-
-export const LaborProfileForm = React.memo(LaborProfileFormComponent);
+});
+LaborProfileForm.displayName = 'LaborProfileForm';
 
     
