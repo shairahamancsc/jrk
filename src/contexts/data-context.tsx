@@ -32,6 +32,7 @@ const getPathFromUrl = (url: string): string | null => {
     const pathSegments = urlObject.pathname.split('/');
     const bucketNameIndex = pathSegments.indexOf(STORAGE_BUCKET_NAME);
     if (bucketNameIndex !== -1 && bucketNameIndex + 1 < pathSegments.length) {
+      // Return the path *inside* the bucket, e.g., 'public/user_id/...'
       return pathSegments.slice(bucketNameIndex + 1).join('/');
     }
     return null;
@@ -229,21 +230,22 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
             pan_number: profileData.panNumber ? profileData.panNumber.toUpperCase() : null,
             daily_salary: profileData.dailySalary || null,
         };
-
+        
+        // Sequentially and correctly handle file updates
         if (profileData.photo instanceof File) {
-            await deleteFile(existingProfile.photo_url);
+            if(existingProfile.photo_url) await deleteFile(existingProfile.photo_url);
             updatePayload.photo_url = await uploadFile(profileData.photo, profileData.name);
         }
         if (profileData.aadhaar instanceof File) {
-            await deleteFile(existingProfile.aadhaar_url);
+            if(existingProfile.aadhaar_url) await deleteFile(existingProfile.aadhaar_url);
             updatePayload.aadhaar_url = await uploadFile(profileData.aadhaar, profileData.name);
         }
         if (profileData.pan instanceof File) {
-            await deleteFile(existingProfile.pan_url);
+            if(existingProfile.pan_url) await deleteFile(existingProfile.pan_url);
             updatePayload.pan_url = await uploadFile(profileData.pan, profileData.name);
         }
         if (profileData.drivingLicense instanceof File) {
-            await deleteFile(existingProfile.driving_license_url);
+            if(existingProfile.driving_license_url) await deleteFile(existingProfile.driving_license_url);
             updatePayload.driving_license_url = await uploadFile(profileData.drivingLicense, profileData.name);
         }
 
@@ -261,12 +263,11 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     } catch (error: any) {
         console.error("An error occurred during the update process:", error);
         toast({ variant: "destructive", title: "Update Error", description: error.message || "An unexpected error occurred." });
-        throw error; // Re-throw to be caught in the form component if needed
+        throw error;
     } finally {
         setIsLoading(false);
     }
   };
-
 
   const deleteLaborProfile = async (profileId: string) => {
     if (!user?.id) {
@@ -409,3 +410,5 @@ export const useData = () => {
   }
   return context;
 };
+
+    

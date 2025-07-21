@@ -91,7 +91,6 @@ const LaborProfileFormComponent = ({
       }
       onSubmitSuccess?.();
     } catch (error) {
-      // Error is already toasted in the context, but we can log it here
       console.error("Form submission failed:", error);
     } finally {
       setIsSubmitting(false);
@@ -316,3 +315,5 @@ const LaborProfileFormComponent = ({
 }
 
 export const LaborProfileForm = React.memo(LaborProfileFormComponent);
+
+    
