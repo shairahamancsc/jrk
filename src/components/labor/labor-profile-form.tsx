@@ -47,8 +47,6 @@ const LaborProfileFormComponent = ({
   });
 
   useEffect(() => {
-    // Reset the form when the `existingProfile` or `mode` changes.
-    // This ensures the form is correctly populated for editing or cleared for adding.
     if (mode === 'edit' && existingProfile) {
       form.reset({
         name: existingProfile.name,
@@ -56,26 +54,15 @@ const LaborProfileFormComponent = ({
         aadhaarNumber: existingProfile.aadhaar_number || '',
         panNumber: existingProfile.pan_number || '',
         dailySalary: existingProfile.daily_salary || undefined,
-        // File inputs are not reset with values for security reasons
         photo: undefined,
         aadhaar: undefined,
         pan: undefined,
         drivingLicense: undefined,
       });
       setPhotoPreviewUrl(existingProfile.photo_url || null);
-    } else if (mode === 'add') {
-       form.reset({ 
-        name: '',
-        contact: '',
-        aadhaarNumber: '',
-        panNumber: '',
-        dailySalary: undefined,
-        photo: undefined,
-        aadhaar: undefined,
-        pan: undefined,
-        drivingLicense: undefined,
-      });
-      setPhotoPreviewUrl(null);
+    } else {
+       form.reset();
+       setPhotoPreviewUrl(null);
     }
   }, [existingProfile, mode, form]);
 
@@ -83,7 +70,6 @@ const LaborProfileFormComponent = ({
   const onSubmit = async (data: LaborProfileFormData) => {
     setIsSubmitting(true);
     
-    // This object prepares the data, including files, for the context functions
     const profileDataForContext: LaborProfileFormDataWithFiles = {
       name: data.name,
       contact: data.contact,
@@ -98,7 +84,6 @@ const LaborProfileFormComponent = ({
 
     try {
       if (mode === 'edit' && existingProfile) {
-        // Pass the ID explicitly to the update function
         await updateLaborProfile(existingProfile.id, profileDataForContext);
       } else {
         await addLaborProfile(profileDataForContext); 
@@ -108,10 +93,8 @@ const LaborProfileFormComponent = ({
         form.reset();
         setPhotoPreviewUrl(null); 
       }
-      // Notify parent component of success
       onSubmitSuccess?.(); 
     } catch (error) {
-      // Errors are toasted within the context, but can be logged here if needed
       console.error("Submission error in form component:", error);
     } finally {
       setIsSubmitting(false);
@@ -120,7 +103,7 @@ const LaborProfileFormComponent = ({
   
   const GenericFileInput = ({ fieldName, label, currentFileUrl }: { fieldName: keyof LaborProfileFormData; label: string, currentFileUrl?: string }) => (
     <FormItem>
-      <FormLabel className="flex items-center gap-2 text-foreground">
+      <FormLabel className="flex items-center gap-2 text-foreground text-xs sm:text-sm">
         <FileText size={16} /> {label}
       </FormLabel>
       {mode === 'edit' && currentFileUrl && (
@@ -138,7 +121,7 @@ const LaborProfileFormComponent = ({
           disabled={isSubmitting}
         />
       </FormControl>
-      <FormMessage />
+      <FormMessage className="text-xs" />
     </FormItem>
   );
 
@@ -149,7 +132,6 @@ const LaborProfileFormComponent = ({
   const submitButtonText = mode === 'edit' ? "Save Changes" : "Add Labor Profile";
   const submittingButtonText = mode === 'edit' ? "Saving..." : "Adding...";
 
-  // The main form content, to be rendered inside a Card or a Dialog
   const formContent = (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-2 sm:space-y-3 md:space-y-4">
@@ -182,7 +164,6 @@ const LaborProfileFormComponent = ({
                         };
                         reader.readAsDataURL(file);
                       } else {
-                        // Revert to original photo if file selection is cancelled
                         setPhotoPreviewUrl(existingProfile?.photo_url || null); 
                         form.setValue('photo', undefined, { shouldValidate: true });
                       }
@@ -330,7 +311,6 @@ const LaborProfileFormComponent = ({
     </Form>
   );
 
-  // Render the form inside a Card for 'add' mode, or render it raw for 'edit' mode (to be placed in a Dialog)
   if (mode === 'add') {
     return (
        <Card className="shadow-lg w-full">
@@ -344,8 +324,7 @@ const LaborProfileFormComponent = ({
       </Card>
     );
   }
-
-  // For 'edit' mode, just return the form content
+  
   return formContent;
 }
 

@@ -14,7 +14,7 @@ interface DataContextType {
   attendanceEntries: AttendanceEntry[];
   paymentHistory: PaymentHistoryEntry[];
   addLaborProfile: (profileData: LaborProfileFormDataWithFiles) => Promise<void>;
-  updateLaborProfile: (profileId: string, profileData: Partial<LaborProfileFormDataWithFiles>) => Promise<void>; 
+  updateLaborProfile: (profileId: string, profileData: LaborProfileFormDataWithFiles) => Promise<void>; 
   deleteLaborProfile: (profileId: string) => Promise<void>;
   fetchLaborProfileById: (profileId: string) => Promise<LaborProfile | null>;
   addAttendanceEntry: (entryData: Omit<AttendanceEntry, 'id' | 'created_at' | 'user_id'>) => Promise<void>;
@@ -30,6 +30,7 @@ const STORAGE_BUCKET_NAME = 'profile-documents';
 const getPathFromUrl = (url: string): string | null => {
   try {
     const urlObject = new URL(url);
+    // Path format is /storage/v1/object/public/bucket_name/folder/file.jpg
     const pathSegments = urlObject.pathname.split('/');
     const bucketNameIndex = pathSegments.indexOf(STORAGE_BUCKET_NAME);
     if (bucketNameIndex !== -1 && bucketNameIndex + 1 < pathSegments.length) {
@@ -259,7 +260,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     setIsLoading(false);
   };
   
-  const updateLaborProfile = async (profileId: string, profileData: Partial<LaborProfileFormDataWithFiles>) => {
+  const updateLaborProfile = async (profileId: string, profileData: LaborProfileFormDataWithFiles) => {
     if (!user?.id) {
         toast({ variant: "destructive", title: "Auth Error", description: "User not authenticated." });
         return;
@@ -269,8 +270,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     try {
         const existingProfile = laborProfiles.find(p => p.id === profileId);
         if (!existingProfile) {
-            toast({ variant: "destructive", title: "Update Error", description: "Original profile not found. Cannot proceed." });
-            return;
+            throw new Error("Original profile not found. Cannot proceed.");
         }
 
         const updatePayload: Partial<LaborProfile> = {
@@ -305,19 +305,19 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
             .eq('user_id', user.id);
 
         if (updateError) {
-            console.error('[DataProvider] Error updating labor profile:', updateError);
-            toast({ variant: "destructive", title: "Update Failed", description: `Could not update profile: ${updateError.message}` });
-        } else {
-            await fetchLaborProfiles();
-            toast({ title: "Success", description: `Profile for ${updatePayload.name || existingProfile.name} updated.` });
+           throw new Error(updateError.message);
         }
-    } catch (error) {
+        
+        await fetchLaborProfiles();
+        toast({ title: "Success", description: `Profile for ${updatePayload.name || existingProfile.name} updated.` });
+        
+    } catch (error: any) {
         console.error("An error occurred during the update process:", error);
-        toast({ variant: "destructive", title: "Update Error", description: "An unexpected error occurred." });
+        toast({ variant: "destructive", title: "Update Error", description: error.message || "An unexpected error occurred." });
     } finally {
         setIsLoading(false);
     }
-};
+  };
 
 
   const deleteLaborProfile = async (profileId: string) => {

@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { LaborProfileForm } from '@/components/labor/labor-profile-form';
 import { useData } from '@/contexts/data-context';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
@@ -24,7 +24,6 @@ import {
   DialogTitle, 
   DialogDescription, 
   DialogHeader,
-  DialogFooter,
 } from "@/components/ui/dialog";
 import {
   DropdownMenu,
@@ -34,7 +33,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { FileText, UserCircle2, Users, Loader2, MoreHorizontal, Eye, Edit3, Trash2, WalletCards } from 'lucide-react';
+import { FileText, UserCircle2, Users, Loader2, MoreHorizontal, Eye, Edit3, Trash2 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import type { LaborProfile } from '@/types';
 import { useToast } from "@/hooks/use-toast";
@@ -44,7 +43,6 @@ export default function LaborPage() {
   const { toast } = useToast();
   const [clientLoading, setClientLoading] = useState(true);
 
-  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
 
@@ -91,11 +89,6 @@ export default function LaborPage() {
     return `₹${amount.toFixed(2)}`;
   };
 
-  const handleOpenViewModal = (profile: LaborProfile) => {
-    setSelectedProfile(profile);
-    setIsViewModalOpen(true);
-  };
-
   const handleOpenEditModal = (profile: LaborProfile) => {
     setSelectedProfile(profile);
     setIsEditModalOpen(true);
@@ -119,16 +112,6 @@ export default function LaborPage() {
       setIsDeleting(false);
     }
   };
-
-  // Callbacks for the Edit Form
-  const handleEditSuccess = () => {
-    setIsEditModalOpen(false); // Close the dialog on successful submission
-  };
-
-  const handleEditCancel = () => {
-    setIsEditModalOpen(false); // Close the dialog on cancellation
-  };
-
   
   if (clientLoading || dataLoading) { 
     return (
@@ -142,7 +125,6 @@ export default function LaborPage() {
     <div className="space-y-8">
       <h1 className="text-2xl sm:text-3xl font-headline font-bold text-primary">Manage Labor Profiles</h1>
       
-      {/* Form for adding a new profile */}
       <LaborProfileForm mode="add" />
 
       <Card className="shadow-lg">
@@ -207,9 +189,6 @@ export default function LaborPage() {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                            <DropdownMenuItem onClick={() => handleOpenViewModal(profile)}>
-                              <Eye className="mr-2 h-4 w-4" /> View
-                            </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handleOpenEditModal(profile)}>
                               <Edit3 className="mr-2 h-4 w-4" /> Edit
                             </DropdownMenuItem>
@@ -234,51 +213,33 @@ export default function LaborPage() {
         </CardContent>
       </Card>
 
-      {/* View Modal */}
-      {selectedProfile && (
-        <Dialog open={isViewModalOpen} onOpenChange={setIsViewModalOpen}>
-          <DialogContent className="w-[90vw] max-w-xs sm:max-w-md rounded-lg">
-            <DialogHeader>
-              <DialogTitle>View Profile: {selectedProfile.name}</DialogTitle>
-              <DialogDescription>
-                Detailed information for {selectedProfile.name}.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4 text-sm">
-              <p><strong>Name:</strong> {selectedProfile.name}</p>
-              <p><strong>Contact:</strong> {selectedProfile.contact}</p>
-              <p><strong>Daily Salary:</strong> {formatCurrency(selectedProfile.daily_salary)}</p>
-              <p><strong>Aadhaar Number:</strong> {selectedProfile.aadhaar_number || 'N/A'}</p>
-              <p><strong>PAN Number:</strong> {selectedProfile.pan_number || 'N/A'}</p>
-              <p><strong>Photo:</strong></p>
-              {selectedProfile.photo_url && <img src={getAvatarSrc(selectedProfile.photo_url)} alt={selectedProfile.name} className="rounded-md max-h-40 sm:max-h-48 mx-auto sm:mx-0" data-ai-hint="profile person"/>}
-              <p><strong>Aadhaar Document:</strong> {getFileDisplay(selectedProfile.aadhaar_url)}</p>
-              <p><strong>PAN Document:</strong> {getFileDisplay(selectedProfile.pan_url)}</p>
-              <p><strong>License Document:</strong> {getFileDisplay(selectedProfile.driving_license_url)}</p>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsViewModalOpen(false)}>Close</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
-
       {/* Edit Modal */}
       {selectedProfile && (
-        <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
-          <DialogContent key={selectedProfile.id} className="w-[95vw] max-w-lg rounded-lg">
+        <Dialog open={isEditModalOpen} onOpenChange={(isOpen) => {
+          setIsEditModalOpen(isOpen);
+          if (!isOpen) {
+            setSelectedProfile(null);
+          }
+        }}>
+          <DialogContent key={selectedProfile.id} className="w-[95vw] max-w-2xl rounded-lg">
              <DialogHeader>
                 <DialogTitle>Edit Profile: {selectedProfile.name}</DialogTitle>
                  <DialogDescription>
                   Modify the details for {selectedProfile.name}. Click Save when you're done.
                 </DialogDescription>
             </DialogHeader>
-            <div className="py-4">
+            <div className="py-4 max-h-[70vh] overflow-y-auto">
               <LaborProfileForm 
                 mode="edit"
                 existingProfile={selectedProfile} 
-                onSubmitSuccess={handleEditSuccess}
-                onCancel={handleEditCancel}
+                onSubmitSuccess={() => {
+                  setIsEditModalOpen(false);
+                  setSelectedProfile(null);
+                }}
+                onCancel={() => {
+                  setIsEditModalOpen(false);
+                  setSelectedProfile(null);
+                }}
               />
             </div>
           </DialogContent>
