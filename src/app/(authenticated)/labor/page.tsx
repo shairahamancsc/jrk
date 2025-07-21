@@ -23,6 +23,7 @@ import {
   DialogContent,
   DialogTitle, 
   DialogDescription, 
+  DialogHeader,
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
@@ -37,7 +38,6 @@ import { FileText, UserCircle2, Users, Loader2, MoreHorizontal, Eye, Edit3, Tras
 import { format, parseISO } from 'date-fns';
 import type { LaborProfile } from '@/types';
 import { useToast } from "@/hooks/use-toast";
-import { cn } from '@/lib/utils';
 
 export default function LaborPage() {
   const { laborProfiles, isLoading: dataLoading, deleteLaborProfile } = useData();
@@ -120,15 +120,15 @@ export default function LaborPage() {
     }
   };
 
-  const handleEditModalCancel = useCallback(() => {
-    setIsEditModalOpen(false);
-    // setSelectedProfile(null); // Consider if you want to clear selection on cancel
-  }, []);
+  // Callbacks for the Edit Form
+  const handleEditSuccess = () => {
+    setIsEditModalOpen(false); // Close the dialog on successful submission
+  };
 
-  const handleEditModalSubmitSuccess = useCallback(() => {
-    setIsEditModalOpen(false);
-    // setSelectedProfile(null); // Consider if you want to clear selection on success
-  }, []);
+  const handleEditCancel = () => {
+    setIsEditModalOpen(false); // Close the dialog on cancellation
+  };
+
   
   if (clientLoading || dataLoading) { 
     return (
@@ -142,7 +142,8 @@ export default function LaborPage() {
     <div className="space-y-8">
       <h1 className="text-2xl sm:text-3xl font-headline font-bold text-primary">Manage Labor Profiles</h1>
       
-      <LaborProfileForm />
+      {/* Form for adding a new profile */}
+      <LaborProfileForm mode="add" />
 
       <Card className="shadow-lg">
         <CardHeader>
@@ -233,15 +234,16 @@ export default function LaborPage() {
         </CardContent>
       </Card>
 
+      {/* View Modal */}
       {selectedProfile && (
         <Dialog open={isViewModalOpen} onOpenChange={setIsViewModalOpen}>
           <DialogContent className="w-[90vw] max-w-xs sm:max-w-md rounded-lg">
-            <div className={cn("flex flex-col space-y-1.5 text-center sm:text-left")}>
+            <DialogHeader>
               <DialogTitle>View Profile: {selectedProfile.name}</DialogTitle>
               <DialogDescription>
                 Detailed information for {selectedProfile.name}.
               </DialogDescription>
-            </div>
+            </DialogHeader>
             <div className="space-y-4 py-4 text-sm">
               <p><strong>Name:</strong> {selectedProfile.name}</p>
               <p><strong>Contact:</strong> {selectedProfile.contact}</p>
@@ -261,27 +263,29 @@ export default function LaborPage() {
         </Dialog>
       )}
 
+      {/* Edit Modal */}
       {selectedProfile && (
         <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
-          <DialogContent key={selectedProfile.id} className="w-[95vw] max-w-xs sm:max-w-lg rounded-lg">
-            <div className={cn("flex flex-col space-y-1.5 text-center sm:text-left")}>
-              <DialogTitle>Edit Profile: {selectedProfile.name}</DialogTitle>
-               <DialogDescription>
-                Modify the details for {selectedProfile.name}.
-              </DialogDescription>
-            </div>
+          <DialogContent key={selectedProfile.id} className="w-[95vw] max-w-lg rounded-lg">
+             <DialogHeader>
+                <DialogTitle>Edit Profile: {selectedProfile.name}</DialogTitle>
+                 <DialogDescription>
+                  Modify the details for {selectedProfile.name}. Click Save when you're done.
+                </DialogDescription>
+            </DialogHeader>
             <div className="py-4">
               <LaborProfileForm 
+                mode="edit"
                 existingProfile={selectedProfile} 
-                mode="edit" 
-                onCancel={handleEditModalCancel}
-                onSubmitSuccess={handleEditModalSubmitSuccess}
+                onSubmitSuccess={handleEditSuccess}
+                onCancel={handleEditCancel}
               />
             </div>
           </DialogContent>
         </Dialog>
       )}
 
+      {/* Delete Alert */}
       {selectedProfile && (
         <AlertDialog open={isDeleteAlertOpen} onOpenChange={setIsDeleteAlertOpen}>
           <AlertDialogContent className="w-[90vw] max-w-xs sm:max-w-md rounded-lg">
@@ -309,7 +313,3 @@ export default function LaborPage() {
     </div>
   );
 }
-
-    
-
-    

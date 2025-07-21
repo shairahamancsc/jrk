@@ -170,11 +170,6 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
     if (error) {
       console.error('[DataProvider] Error uploading file. Raw error object:', error);
-      try {
-        console.error('[DataProvider] Error uploading file (JSON.stringify):', JSON.stringify(error, null, 2));
-      } catch (e) {
-        console.error('[DataProvider] Could not stringify error object for upload:', e);
-      }
       toast({ 
         variant: "destructive", 
         title: "Upload Error", 
@@ -266,58 +261,63 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   
   const updateLaborProfile = async (profileId: string, profileData: Partial<LaborProfileFormDataWithFiles>) => {
     if (!user?.id) {
-      toast({ variant: "destructive", title: "Auth Error", description: "User not authenticated." });
-      return;
+        toast({ variant: "destructive", title: "Auth Error", description: "User not authenticated." });
+        return;
     }
     setIsLoading(true);
-  
-    const existingProfile = laborProfiles.find(p => p.id === profileId);
-    if (!existingProfile) {
-      toast({ variant: "destructive", title: "Update Error", description: "Original profile not found. Cannot proceed." });
-      setIsLoading(false);
-      return;
+
+    try {
+        const existingProfile = laborProfiles.find(p => p.id === profileId);
+        if (!existingProfile) {
+            toast({ variant: "destructive", title: "Update Error", description: "Original profile not found. Cannot proceed." });
+            return;
+        }
+
+        const updatePayload: Partial<LaborProfile> = {
+            name: profileData.name,
+            contact: profileData.contact,
+            aadhaar_number: profileData.aadhaarNumber || null,
+            pan_number: profileData.panNumber ? profileData.panNumber.toUpperCase() : null,
+            daily_salary: profileData.dailySalary || null,
+        };
+
+        if (profileData.photo instanceof File) {
+            await deleteFile(existingProfile.photo_url);
+            updatePayload.photo_url = await uploadFile(profileData.photo, profileData.name || existingProfile.name);
+        }
+        if (profileData.aadhaar instanceof File) {
+            await deleteFile(existingProfile.aadhaar_url);
+            updatePayload.aadhaar_url = await uploadFile(profileData.aadhaar, profileData.name || existingProfile.name);
+        }
+        if (profileData.pan instanceof File) {
+            await deleteFile(existingProfile.pan_url);
+            updatePayload.pan_url = await uploadFile(profileData.pan, profileData.name || existingProfile.name);
+        }
+        if (profileData.drivingLicense instanceof File) {
+            await deleteFile(existingProfile.driving_license_url);
+            updatePayload.driving_license_url = await uploadFile(profileData.drivingLicense, profileData.name || existingProfile.name);
+        }
+
+        const { error: updateError } = await supabase
+            .from('labor_profiles')
+            .update(updatePayload)
+            .eq('id', profileId)
+            .eq('user_id', user.id);
+
+        if (updateError) {
+            console.error('[DataProvider] Error updating labor profile:', updateError);
+            toast({ variant: "destructive", title: "Update Failed", description: `Could not update profile: ${updateError.message}` });
+        } else {
+            await fetchLaborProfiles();
+            toast({ title: "Success", description: `Profile for ${updatePayload.name || existingProfile.name} updated.` });
+        }
+    } catch (error) {
+        console.error("An error occurred during the update process:", error);
+        toast({ variant: "destructive", title: "Update Error", description: "An unexpected error occurred." });
+    } finally {
+        setIsLoading(false);
     }
-  
-    const updatePayload: Partial<LaborProfile> = {
-      name: profileData.name,
-      contact: profileData.contact,
-      aadhaar_number: profileData.aadhaarNumber || null,
-      pan_number: profileData.panNumber ? profileData.panNumber.toUpperCase() : null,
-      daily_salary: profileData.dailySalary || null,
-    };
-  
-    if (profileData.photo instanceof File) {
-      await deleteFile(existingProfile.photo_url);
-      updatePayload.photo_url = await uploadFile(profileData.photo, profileData.name || existingProfile.name);
-    }
-    if (profileData.aadhaar instanceof File) {
-      await deleteFile(existingProfile.aadhaar_url);
-      updatePayload.aadhaar_url = await uploadFile(profileData.aadhaar, profileData.name || existingProfile.name);
-    }
-    if (profileData.pan instanceof File) {
-      await deleteFile(existingProfile.pan_url);
-      updatePayload.pan_url = await uploadFile(profileData.pan, profileData.name || existingProfile.name);
-    }
-    if (profileData.drivingLicense instanceof File) {
-      await deleteFile(existingProfile.driving_license_url);
-      updatePayload.driving_license_url = await uploadFile(profileData.drivingLicense, profileData.name || existingProfile.name);
-    }
-  
-    const { error: updateError } = await supabase
-      .from('labor_profiles')
-      .update(updatePayload)
-      .eq('id', profileId)
-      .eq('user_id', user.id);
-  
-    if (updateError) {
-      console.error('[DataProvider] Error updating labor profile:', updateError);
-      toast({ variant: "destructive", title: "Update Failed", description: `Could not update profile: ${updateError.message}` });
-    } else {
-      await fetchLaborProfiles(); 
-      toast({ title: "Success", description: `Profile for ${updatePayload.name || existingProfile.name} updated.` });
-    }
-    setIsLoading(false);
-  };
+};
 
 
   const deleteLaborProfile = async (profileId: string) => {
@@ -480,7 +480,3 @@ export const useData = () => {
   }
   return context;
 };
-
-    
-
-    
