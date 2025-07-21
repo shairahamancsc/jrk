@@ -197,7 +197,8 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
     if (error) {
       console.error('[DataProvider] Error deleting file from storage:', filePath, error);
-      toast({ variant: "destructive", title: "Storage Error", description: `Could not delete old file: ${error.message}` });
+      // We don't toast here because this is part of a larger operation. The caller will handle toast.
+      // toast({ variant: "destructive", title: "Storage Error", description: `Could not delete old file: ${error.message}` });
       return false;
     }
     console.log("[DataProvider] Successfully deleted old file:", filePath);
@@ -211,53 +212,58 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     }
     setIsLoading(true);
 
-    let photo_url: string | undefined = undefined;
-    if (profileFormData.photo instanceof File) {
-      photo_url = await uploadFile(profileFormData.photo, profileFormData.name);
-    }
+    try {
+      let photo_url: string | undefined = undefined;
+      if (profileFormData.photo instanceof File) {
+        photo_url = await uploadFile(profileFormData.photo, profileFormData.name);
+      }
 
-    let aadhaar_url: string | undefined = undefined;
-    if (profileFormData.aadhaar instanceof File) {
-      aadhaar_url = await uploadFile(profileFormData.aadhaar, profileFormData.name);
-    }
+      let aadhaar_url: string | undefined = undefined;
+      if (profileFormData.aadhaar instanceof File) {
+        aadhaar_url = await uploadFile(profileFormData.aadhaar, profileFormData.name);
+      }
 
-    let pan_url: string | undefined = undefined;
-    if (profileFormData.pan instanceof File) {
-      pan_url = await uploadFile(profileFormData.pan, profileFormData.name);
-    }
+      let pan_url: string | undefined = undefined;
+      if (profileFormData.pan instanceof File) {
+        pan_url = await uploadFile(profileFormData.pan, profileFormData.name);
+      }
 
-    let driving_license_url: string | undefined = undefined;
-    if (profileFormData.drivingLicense instanceof File) {
-      driving_license_url = await uploadFile(profileFormData.drivingLicense, profileFormData.name);
-    }
+      let driving_license_url: string | undefined = undefined;
+      if (profileFormData.drivingLicense instanceof File) {
+        driving_license_url = await uploadFile(profileFormData.drivingLicense, profileFormData.name);
+      }
 
-    const profileToInsert: Omit<Database['public']['Tables']['labor_profiles']['Insert'], 'id' | 'created_at'> = {
-      user_id: user.id,
-      name: profileFormData.name,
-      contact: profileFormData.contact,
-      aadhaar_number: profileFormData.aadhaarNumber,
-      pan_number: profileFormData.panNumber ? profileFormData.panNumber.toUpperCase() : undefined,
-      daily_salary: profileFormData.dailySalary, 
-      photo_url,
-      aadhaar_url,
-      pan_url,
-      driving_license_url,
-    };
-    
-    const { data, error } = await supabase
-      .from('labor_profiles')
-      .insert(profileToInsert)
-      .select()
-      .single();
+      const profileToInsert: Omit<Database['public']['Tables']['labor_profiles']['Insert'], 'id' | 'created_at'> = {
+        user_id: user.id,
+        name: profileFormData.name,
+        contact: profileFormData.contact,
+        aadhaar_number: profileFormData.aadhaarNumber,
+        pan_number: profileFormData.panNumber ? profileFormData.panNumber.toUpperCase() : undefined,
+        daily_salary: profileFormData.dailySalary, 
+        photo_url,
+        aadhaar_url,
+        pan_url,
+        driving_license_url,
+      };
+      
+      const { data, error } = await supabase
+        .from('labor_profiles')
+        .insert(profileToInsert)
+        .select()
+        .single();
 
-    if (error) {
-      console.error('[DataProvider] Error adding labor profile:', error);
-      toast({ variant: "destructive", title: "Database Error", description: `Could not add labor profile: ${error.message}` });
-    } else if (data) {
+      if (error) {
+        throw new Error(error.message);
+      }
+      
       await fetchLaborProfiles(); 
       toast({ title: "Success", description: "Labor profile added." });
+    } catch (error: any) {
+      console.error('[DataProvider] Error adding labor profile:', error);
+      toast({ variant: "destructive", title: "Database Error", description: `Could not add labor profile: ${error.message}` });
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   };
   
   const updateLaborProfile = async (profileId: string, profileData: LaborProfileFormDataWithFiles) => {
@@ -270,7 +276,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     try {
         const existingProfile = laborProfiles.find(p => p.id === profileId);
         if (!existingProfile) {
-            throw new Error("Original profile not found. Cannot proceed.");
+            throw new Error("Original profile not found in local state. Cannot proceed.");
         }
 
         const updatePayload: Partial<LaborProfile> = {
@@ -281,6 +287,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
             daily_salary: profileData.dailySalary || null,
         };
 
+        // Handle file updates: delete old and upload new if a new file is provided.
         if (profileData.photo instanceof File) {
             await deleteFile(existingProfile.photo_url);
             updatePayload.photo_url = await uploadFile(profileData.photo, profileData.name || existingProfile.name);
